@@ -1,0 +1,16 @@
+
+# Gradle
+.gradle/
+
+# IDEA
+*.iml
+*.idea
+/.idea
+
+# Binary
+/target/
+/*/target/
+/build/
+/*/build/
+/*/bin/
+/*/generated/
