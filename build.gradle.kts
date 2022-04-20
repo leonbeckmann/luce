@@ -12,7 +12,8 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.5")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 }
 
