@@ -1,0 +1,35 @@
+{
+  "policy" : {
+    "issuer" : "issuerIdentity",
+    "contexts" : [
+      {
+        "type" : "objectId",
+        "value" : "123"
+      }
+    ],
+    "validity" : {
+      "notBefore" : 5
+    },
+    "rights" : [
+      "RIGHT_ID_READ",
+      "RIGHT_ID_WRITE",
+      "RIGHT_ID_APPEND"
+    ],
+    "preAccess" : {
+      "rules" : []
+    },
+    "ongoingAccess" : {
+      "triggers" : [
+        {
+          "type" : "period",
+          "period" : 5
+        }
+      ],
+      "rules" : []
+    },
+    "postAccess" : {
+      "rules" : []
+    }
+  },
+  "signature" : "policySignature"
+}

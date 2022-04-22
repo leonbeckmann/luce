@@ -1,12 +1,15 @@
 package healthcare
 
+import core.LuceConfiguration
 import core.LuceRight
+import core.control_flow_model.components.PolicyDecisionPoint
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.FileInputStream
 import java.security.SignatureException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.time.OffsetDateTime
 
 /**
  * Representing the Healthcare Test from Section 5.2.2:
@@ -43,12 +46,21 @@ class HealthcareTest {
         return factory.generateCertificate(input) as X509Certificate
     }
 
+    // OffsetDateTime.now().toEpochSecond()
+
     @Test
     fun integrationTest() {
 
         // create root authority: health management facility
         val healthMgmtFacility = HealthManagementFacility(readCertificate("identities/ca.crt"))
         healthMgmtFacility.identity.verify(healthMgmtFacility.identity.publicKey)
+
+        // register healthMgmtFacility as PMP at PDP
+        val config = LuceConfiguration.Builder()
+            .setPolicyManagementPoint(healthMgmtFacility)
+            .build()
+
+        PolicyDecisionPoint.configure(config)
 
         // create hospital organization
         val hospital = healthMgmtFacility.registerSubject(readCertificate("identities/hospital.crt"))

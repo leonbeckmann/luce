@@ -6,4 +6,7 @@ package core.control_flow_model.components
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
 interface PolicyInformationPoint {
+
+    fun <T> query(urn: String) : T?
+
 }

@@ -5,5 +5,4 @@ package core.control_flow_model.components
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-class ReevaluationTimer {
-}
+class ReevaluationTimer
