@@ -55,11 +55,15 @@ class UsageSession {
     var state: State = State.Initial
         private set
 
+    fun reset() {
+        this.state = State.Initial
+    }
+
 
     /**
      * Synchronization for fsm
      */
-    private val lock = ReentrantLock()
+    val lock = ReentrantLock()
 
     /**
      * Registered transitions

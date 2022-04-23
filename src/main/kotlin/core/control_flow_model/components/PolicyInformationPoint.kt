@@ -5,4 +5,9 @@ package core.control_flow_model.components
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-interface PolicyInformationPoint
+interface PolicyInformationPoint {
+
+    fun queryInformation(informationId: String) : Any?
+    fun updateInformation(informationId: String, newValue: Any?)
+
+}
