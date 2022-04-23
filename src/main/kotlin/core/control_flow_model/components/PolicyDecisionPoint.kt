@@ -33,8 +33,10 @@ class PolicyDecisionPoint {
             val session = sessionPip.queryInformation(sessionId) as UsageSession
             if (session.state != UsageSession.State.Initial) throw LuceException("Usage session not in initial state")
 
-            // TODO get policy from PMP
-
+            // get policy from PMP
+            val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
+                throw LuceException("Policy is missing")
+            
             // TODO evaluate policy
 
             // TODO on success, bind policy to session
