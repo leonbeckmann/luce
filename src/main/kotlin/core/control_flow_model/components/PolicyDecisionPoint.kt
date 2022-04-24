@@ -5,8 +5,6 @@ import core.control_flow_model.messages.DecisionResponse
 import core.exceptions.LuceException
 import core.logic.PolicyEvaluator
 import core.usage_decision_process.UsageSession
-import it.unibo.tuprolog.core.Atom
-import it.unibo.tuprolog.dsl.prolog
 import it.unibo.tuprolog.solve.Solution
 import it.unibo.tuprolog.solve.SolveOptions
 
@@ -45,19 +43,21 @@ class PolicyDecisionPoint {
             val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
                 throw LuceException("Policy is missing")
 
-            // TODO evaluate policy
+            // evaluate policy
             val solution = PolicyEvaluator.evaluate(
-                prolog { Atom.of("Alice") and Atom.of("Bob") },
+                policy.preAccess,
                 SolveOptions.DEFAULT
             )
 
             // respond according to result
-            // TODo fill responses
+            // TODO fill responses
             when (solution) {
                 is Solution.Yes -> {
                     // on success, permit access and bind policy to session
                     session.feedEvent(UsageSession.Event.PermitAccess)
                     session.bindToPolicy(policy)
+
+                    // TODO UR2
 
                     // unlock session for further usage
                     session.unlock()

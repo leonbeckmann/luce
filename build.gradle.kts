@@ -20,9 +20,9 @@ dependencies {
     implementation("it.unibo.tuprolog", "solve-jvm", "0.20.4") // resolution solver
     implementation("it.unibo.tuprolog", "solve-classic-jvm", "0.20.4") // SLDNF resolution implementation
 
-    // implementation("it.unibo.tuprolog", "parser-jvm", "0.20.4")
-    // implementation("it.unibo.tuprolog", "parser-core-jvm", "0.20.4")
-    // implementation("it.unibo.tuprolog", "parser-theory-jvm", "0.20.4")
+    implementation("it.unibo.tuprolog", "parser-jvm", "0.20.4")
+    implementation("it.unibo.tuprolog", "parser-core-jvm", "0.20.4")
+    implementation("it.unibo.tuprolog", "parser-theory-jvm", "0.20.4")
 
     // implementation("it.unibo.tuprolog", "serialize-core-jvm", "0.20.4")
     // implementation("it.unibo.tuprolog", "serialize-theory-jvm", "0.20.4")

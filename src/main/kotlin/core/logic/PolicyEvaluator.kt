@@ -5,6 +5,7 @@ import it.unibo.tuprolog.solve.Solution
 import it.unibo.tuprolog.solve.SolveOptions
 import it.unibo.tuprolog.solve.Solver
 import it.unibo.tuprolog.solve.library.AliasedLibrary
+import it.unibo.tuprolog.solve.library.Library
 
 /**
  * Policy Evaluator, used for solving PROLOG queries
@@ -15,29 +16,26 @@ class PolicyEvaluator {
 
     companion object {
 
-        private val solver = Solver.prolog.mutableSolverWithDefaultBuiltins()
-        private val defaultLibrary = DefaultLibrary()
+        private val libraries = mutableSetOf<AliasedLibrary>(DefaultLibrary())
 
-        init {
-            // configure solver
-            solver.loadLibrary(defaultLibrary)
+        fun registerCustomLibrary(library: AliasedLibrary) {
+            libraries.add(library)
         }
 
-        // TODO load theories, clauses
-
-        fun loadCustomLibrary(library: AliasedLibrary) {
-            solver.loadLibrary(library)
-        }
-
-        fun unloadCustomLibrary(library: AliasedLibrary) {
-            // ensure to not unload default library
-            if (library != defaultLibrary) {
-                solver.unloadLibrary(library)
-            }
+        fun unregisterCustomLibrary(library: AliasedLibrary) {
+            libraries.remove(library)
         }
 
         fun evaluate(goal: Struct, options: SolveOptions): Solution {
-            return solver.clone().solveOnce(goal, options)
+
+            // configure solver
+            val solver = Solver.prolog.mutableSolverWithDefaultBuiltins()
+            libraries.iterator().forEach {
+                solver.loadLibrary(it)
+            }
+
+            // solve and return solution
+            return solver.solveOnce(goal, options)
         }
 
     }

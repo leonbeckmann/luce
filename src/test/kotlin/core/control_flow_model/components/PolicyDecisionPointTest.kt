@@ -7,11 +7,10 @@ import core.control_flow_model.messages.DecisionRequest
 import core.logic.PolicyEvaluator
 import core.policies.LucePolicy
 import core.usage_decision_process.SessionPip
-import it.unibo.tuprolog.core.Atom
-import it.unibo.tuprolog.core.Clause
-import it.unibo.tuprolog.core.Truth
+import it.unibo.tuprolog.core.*
+import it.unibo.tuprolog.dsl.prolog
 import it.unibo.tuprolog.solve.library.Library
-import it.unibo.tuprolog.theory.Theory
+import it.unibo.tuprolog.theory.parsing.ClausesParser
 import org.junit.jupiter.api.Test
 
 internal class PolicyDecisionPointTest {
@@ -28,7 +27,13 @@ internal class PolicyDecisionPointTest {
 
     class ExamplePmp : PolicyManagementPoint {
         override fun pullPolicy(): LucePolicy {
-            return LucePolicy()
+            return LucePolicy(
+                preAccess = prolog { "father"("abraham", "Y") } ,
+                Truth.TRUE,
+                Truth.TRUE,
+                Truth.TRUE,
+                Truth.TRUE
+            )
         }
     }
 
@@ -42,13 +47,16 @@ internal class PolicyDecisionPointTest {
         ComponentRegistry.addPolicyInformationPoint("usage_session", SessionPip())
 
         // load custom prolog library
-        PolicyEvaluator.loadCustomLibrary(
+        PolicyEvaluator.registerCustomLibrary(
             Library.aliased(
                 alias = "custom_library",
                 // operatorSet = ,
-                theory = Theory.indexedOf(
-                    Clause.of(Atom.of("Alice"), Truth.TRUE),
-                    Clause.of(Atom.of("Bob"), Truth.TRUE),
+                theory = ClausesParser.withDefaultOperators.parseTheory(
+                    """
+                        grandfather(X, Y) :- father(X, Z), father(Z, Y).
+                        father(abraham, isaac).
+                        father(isaac, jacob).
+                    """.trimIndent()
                 ),
                 // primitives = ,
                 // functions = ,
