@@ -1,5 +1,6 @@
 package core.control_flow_model.components
 
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -11,11 +12,16 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object ComponentRegistry {
 
+    private val LOG = LoggerFactory.getLogger(ComponentRegistry::class.java)
+
     lateinit var policyManagementPoint: PolicyManagementPoint
 
     val policyInformationPoints = ConcurrentHashMap<String, PolicyInformationPoint>()
 
     fun addPolicyInformationPoint(id: String, pip: PolicyInformationPoint) {
+        if (LOG.isTraceEnabled) {
+            LOG.trace("Register PIP with id=$id")
+        }
         policyInformationPoints[id] = pip
     }
 

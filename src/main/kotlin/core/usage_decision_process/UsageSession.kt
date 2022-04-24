@@ -1,6 +1,7 @@
 package core.usage_decision_process
 
 import core.policies.LucePolicy
+import org.slf4j.LoggerFactory
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -59,8 +60,9 @@ class UsageSession {
         private set
 
     fun bindToPolicy(policy: LucePolicy) {
-        if (state == State.Accessing)
+        if (state == State.Accessing) {
             this.policy = policy
+        }
     }
 
     fun reset() {

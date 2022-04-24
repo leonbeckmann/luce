@@ -40,6 +40,9 @@ internal class PolicyDecisionPointTest {
     @Test
     fun pdpTest() {
 
+        // set logging level for pdpTest to TRACE
+        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "trace");
+
         // register PMP
         ComponentRegistry.policyManagementPoint = ExamplePmp()
 

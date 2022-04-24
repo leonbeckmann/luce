@@ -13,6 +13,10 @@ repositories {
 dependencies {
     implementation(kotlin("stdlib"))
 
+    // Logging
+    implementation("org.slf4j", "slf4j-api", "1.7.36")
+    implementation("org.slf4j", "slf4j-simple", "1.7.36")
+
     // TU PROLOG
     implementation("it.unibo.tuprolog", "core-jvm", "0.20.4")
     implementation("it.unibo.tuprolog", "unify-jvm", "0.20.4")
