@@ -1,6 +1,5 @@
 package core.usage_decision_process
 
-
 import java.util.concurrent.locks.ReentrantLock
 
 /**

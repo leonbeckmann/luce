@@ -3,7 +3,12 @@ package core.control_flow_model.components
 import core.control_flow_model.messages.DecisionRequest
 import core.control_flow_model.messages.DecisionResponse
 import core.exceptions.LuceException
+import core.logic.PolicyEvaluator
 import core.usage_decision_process.UsageSession
+import it.unibo.tuprolog.core.Atom
+import it.unibo.tuprolog.dsl.prolog
+import it.unibo.tuprolog.solve.Solution
+import it.unibo.tuprolog.solve.SolveOptions
 
 /**
  * LUCE PDP
@@ -36,10 +41,21 @@ class PolicyDecisionPoint {
             // get policy from PMP
             val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
                 throw LuceException("Policy is missing")
-            
-            // TODO evaluate policy
 
-            // TODO on success, bind policy to session
+            // TODO evaluate policy
+            val solution = PolicyEvaluator.evaluate(
+                prolog { Atom.of("Alice") and Atom.of("Bob") },
+                SolveOptions.DEFAULT
+            )
+
+            // TODO act according to result
+            when (solution) {
+                is Solution.Yes -> {
+                    // TODO on success, bind policy to session
+                }
+                is Solution.No -> {}
+                is Solution.Halt -> {}
+            }
 
             // unlock session
             session.unlock()

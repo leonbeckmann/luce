@@ -11,6 +11,7 @@ abstract class LuceObject<Sid, Oid>(
     val type: String,
     ownerRights: Set<LuceRight>
 ) {
+
     val rights = mutableMapOf<Sid, MutableSet<LuceRight>>()
 
     init {
