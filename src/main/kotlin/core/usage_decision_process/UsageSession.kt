@@ -1,5 +1,6 @@
 package core.usage_decision_process
 
+import core.policies.LucePolicy
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -54,8 +55,17 @@ class UsageSession {
     var state: State = State.Initial
         private set
 
+    var policy: LucePolicy? = null
+        private set
+
+    fun bindToPolicy(policy: LucePolicy) {
+        if (state == State.Accessing)
+            this.policy = policy
+    }
+
     fun reset() {
         this.state = State.Initial
+        this.policy = null
     }
 
 

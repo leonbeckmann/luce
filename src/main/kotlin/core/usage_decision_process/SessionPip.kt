@@ -47,6 +47,7 @@ class SessionPip : PolicyInformationPoint {
         if (session.lock.hasQueuedThreads()) {
             session.reset()
             sessions[informationId] = session
+            session.unlock()
         }
     }
 

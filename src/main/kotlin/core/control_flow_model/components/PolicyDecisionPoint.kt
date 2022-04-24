@@ -38,6 +38,9 @@ class PolicyDecisionPoint {
             val session = sessionPip.queryInformation(sessionId) as UsageSession
             if (session.state != UsageSession.State.Initial) throw LuceException("Usage session not in initial state")
 
+            // feed tryAccess
+            session.feedEvent(UsageSession.Event.TryAccess)
+
             // get policy from PMP
             val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
                 throw LuceException("Policy is missing")
@@ -48,20 +51,37 @@ class PolicyDecisionPoint {
                 SolveOptions.DEFAULT
             )
 
-            // TODO act according to result
+            // respond according to result
+            // TODo fill responses
             when (solution) {
                 is Solution.Yes -> {
-                    // TODO on success, bind policy to session
+                    // on success, permit access and bind policy to session
+                    session.feedEvent(UsageSession.Event.PermitAccess)
+                    session.bindToPolicy(policy)
+
+                    // unlock session for further usage
+                    session.unlock()
+
+                    // return positive decision
+                    return DecisionResponse()
                 }
-                is Solution.No -> {}
-                is Solution.Halt -> {}
+                is Solution.No -> {
+                    // on failure, deny access and delete usage session
+                    session.feedEvent(UsageSession.Event.DenyAccess)
+                    sessionPip.updateInformation(sessionId, null)
+
+                    // return negative decision
+                    return DecisionResponse()
+                }
+                is Solution.Halt -> {
+                    // on exception, deny access and delete usage session
+                    session.feedEvent(UsageSession.Event.DenyAccess)
+                    sessionPip.updateInformation(sessionId, null)
+
+                    // return negative decision
+                    return DecisionResponse()
+                }
             }
-
-            // unlock session
-            session.unlock()
-
-            // TODO fill decision
-            return DecisionResponse()
         }
     }
 }
