@@ -29,10 +29,11 @@ internal class PolicyDecisionPointTest {
         override fun pullPolicy(): LucePolicy {
             return LucePolicy(
                 preAccess = prolog { "father"("abraham", "Y") } ,
-                Truth.TRUE,
-                Truth.TRUE,
-                Truth.TRUE,
-                Truth.TRUE
+                postPermit = Truth.TRUE,
+                ongoingAccess = Truth.TRUE,
+                ongoingPeriod = 1000,
+                postAccessEnded = Truth.TRUE,
+                postAccessRevoked = Truth.TRUE
             )
         }
     }

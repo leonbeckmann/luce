@@ -55,6 +55,9 @@ class SessionPip : PolicyInformationPoint {
         if (!session.lock.isHeldByCurrentThread)
             throw LuceException("Session with id=$informationId not held by current thread")
 
+        // cancel reevaluation timer
+        session.cancelTimer()
+
         // remove the session from the map to avoid race conditions that could occur after we check for waiters
         sessions.remove(informationId)
 

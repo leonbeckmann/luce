@@ -1,7 +1,7 @@
 package core.usage_decision_process
 
+import core.control_flow_model.components.ReevaluationTimer
 import core.policies.LucePolicy
-import org.slf4j.LoggerFactory
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -63,6 +63,13 @@ class UsageSession {
         if (state == State.Accessing) {
             this.policy = policy
         }
+    }
+
+    var reevaluationTimer: ReevaluationTimer? = null
+
+    fun cancelTimer() {
+        reevaluationTimer?.cancel()
+        reevaluationTimer = null
     }
 
     fun reset() {

@@ -78,6 +78,13 @@ class PolicyDecisionPoint {
 
                     // TODO UR2
 
+                    // start reevaluation timer (if configured) for ongoing usage decisions
+                    if (policy.ongoingPeriod != null) {
+                        val timer = ReevaluationTimer(policy.ongoingPeriod, policy.ongoingPeriod, sessionId)
+                        timer.schedule()
+                        session.reevaluationTimer = timer
+                    }
+
                     // unlock session for further usage
                     session.unlock()
 
@@ -112,5 +119,13 @@ class PolicyDecisionPoint {
                 }
             }
         }
+
+        fun triggerPeriodic(sessionId: String) {
+            if (LOG.isTraceEnabled) {
+                LOG.trace("Usage decision triggered by reevaluation timer for session with id=$sessionId")
+            }
+            // TODO
+        }
+
     }
 }
