@@ -36,15 +36,12 @@ class PolicyDecisionPoint {
                 )
             }
 
-            // initiate fresh usage session at the session PIP, session must not be active yet
-            val sessionPip = ComponentRegistry.policyInformationPoints["usage_session"] ?:
-                throw LuceException("PIP for usage sessions not available")
-
+            // initiate fresh usage session at the session PIP, session must not be active yet, i.e. in initial state
             val sessionId =
                 request.luceObject.identity.toString() + request.luceSubject.identity.toString() + request.luceRight.id
 
-            val session = sessionPip.queryInformation(sessionId) as UsageSession
-            if (session.state != UsageSession.State.Initial) throw LuceException("Usage session not in initial state")
+            // TODO catch exception for invalid state and return negative response due to already in use
+            val session = getSession(sessionId, UsageSession.State.Initial)
 
             // feed tryAccess
             session.feedEvent(UsageSession.Event.TryAccess)
@@ -91,28 +88,22 @@ class PolicyDecisionPoint {
                     // return positive decision
                     return DecisionResponse.PERMITTED
                 }
-                is Solution.No -> {
-
-                    if (LOG.isDebugEnabled) {
-                        LOG.debug("Negative policy evaluation result - Deny the usage")
+                else -> {
+                    if (solution is Solution.Halt) {
+                        // failure with exception
+                        if (LOG.isDebugEnabled) {
+                            LOG.debug("Policy evaluation failed with an exception=${solution.exception} - Deny the usage")
+                        }
+                    } else {
+                        // negative prolog decision
+                        if (LOG.isDebugEnabled) {
+                            LOG.debug("Negative policy evaluation result - Deny the usage")
+                        }
                     }
 
                     // on failure, deny access and delete usage session
                     session.feedEvent(UsageSession.Event.DenyAccess)
-                    sessionPip.updateInformation(sessionId, null)
-
-                    // return negative decision
-                    return DecisionResponse.DENIED
-                }
-                is Solution.Halt -> {
-
-                    if (LOG.isDebugEnabled) {
-                        LOG.debug("Policy evaluation failed with an exception=${solution.exception} - Deny the usage")
-                    }
-
-                    // on exception, deny access and delete usage session
-                    session.feedEvent(UsageSession.Event.DenyAccess)
-                    sessionPip.updateInformation(sessionId, null)
+                    getPip("usage_session").updateInformation(sessionId, null)
 
                     // return negative decision
                     return DecisionResponse.DENIED
@@ -120,11 +111,101 @@ class PolicyDecisionPoint {
             }
         }
 
+        /**
+         * PDP logic: ReevaluationTimer triggers policy re-evaluation.
+         *
+         * Calling this function corresponds with ongoing action.
+         */
         fun triggerPeriodic(sessionId: String) {
             if (LOG.isTraceEnabled) {
                 LOG.trace("Usage decision triggered by reevaluation timer for session with id=$sessionId")
             }
+
+            // get session and assert state = accessing
+            val session = getSession(sessionId, UsageSession.State.Accessing)
+            val policy = session.policy ?: throw LuceException("Missing policy for ongoing session=$sessionId")
+
+            // re-evaluate policy
+            if (LOG.isTraceEnabled) {
+                LOG.trace("Retrieved policy=$policy from session")
+                LOG.trace("Start ongoing-access policy evaluation")
+            }
+
+            // evaluate policy
+            val solution = PolicyEvaluator.evaluate(
+                policy.ongoingAccess,
+                SolveOptions.DEFAULT
+            )
+
+            when (solution) {
+                is Solution.Yes -> {
+                    if (LOG.isDebugEnabled) {
+                        LOG.debug("Positive policy re-evaluation result - Continue the usage")
+                    }
+
+                    // unlock session for further usage
+                    session.unlock()
+                }
+                else -> {
+                    if (solution is Solution.Halt) {
+                        // failure with exception
+                        if (LOG.isDebugEnabled) {
+                            LOG.debug("Policy re-evaluation failed with an exception=${solution.exception} - Revoke the usage")
+                        }
+                    } else {
+                        // negative prolog decision
+                        if (LOG.isDebugEnabled) {
+                            LOG.debug("Negative policy re-evaluation result - Revoke the usage")
+                        }
+                    }
+
+                    // revoke the usage on failure
+                    session.feedEvent(UsageSession.Event.RevokeAccess)
+                    val revokeSolution = PolicyEvaluator.evaluate(
+                        policy.postAccessRevoked,
+                        SolveOptions.DEFAULT
+                    )
+
+                    if (LOG.isDebugEnabled){
+                        LOG.debug("Revocation resulted in solution=$revokeSolution")
+                    }
+
+                    // delete session
+                    getPip("usage_session").updateInformation(sessionId, null)
+                }
+            }
+        }
+
+        /**
+         * PDP logic: End the usage synchronously, triggered by the subject.
+         *
+         * Calling this function corresponds with the endAccess action.
+         */
+        fun endUsage() {
             // TODO
+        }
+
+        private fun getPip(pipIdentifier: String): PolicyInformationPoint {
+            return ComponentRegistry.policyInformationPoints[pipIdentifier]
+                ?: throw LuceException("PIP with identifier=$pipIdentifier is not registered")
+        }
+
+        private fun getSession(sessionId: String, expectedState: UsageSession.State) : UsageSession {
+
+            // get session PIP
+            val sessionPip = getPip("usage_session")
+
+            // get session
+            val session = sessionPip.queryInformation(sessionId) as UsageSession
+
+            // check expected state, on mismatch throw exception
+            if (session.state != expectedState) {
+                val state = session.state
+                session.unlock()
+                throw LuceException("Usage session (current state=$state) is not in expected state=$expectedState")
+            }
+
+            return session
         }
 
     }
