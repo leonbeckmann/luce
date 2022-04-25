@@ -65,7 +65,6 @@ class PolicyDecisionPoint {
             )
 
             // respond according to result
-            // TODO fill responses
             when (solution) {
                 is Solution.Yes -> {
 
@@ -83,7 +82,7 @@ class PolicyDecisionPoint {
                     session.unlock()
 
                     // return positive decision
-                    return DecisionResponse()
+                    return DecisionResponse.PERMITTED
                 }
                 is Solution.No -> {
 
@@ -96,12 +95,12 @@ class PolicyDecisionPoint {
                     sessionPip.updateInformation(sessionId, null)
 
                     // return negative decision
-                    return DecisionResponse()
+                    return DecisionResponse.DENIED
                 }
                 is Solution.Halt -> {
 
                     if (LOG.isDebugEnabled) {
-                        LOG.debug("Policy evaluation failed with an exception - Deny the usage")
+                        LOG.debug("Policy evaluation failed with an exception=${solution.exception} - Deny the usage")
                     }
 
                     // on exception, deny access and delete usage session
@@ -109,7 +108,7 @@ class PolicyDecisionPoint {
                     sessionPip.updateInformation(sessionId, null)
 
                     // return negative decision
-                    return DecisionResponse()
+                    return DecisionResponse.DENIED
                 }
             }
         }

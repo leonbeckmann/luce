@@ -5,4 +5,17 @@ package core.control_flow_model.messages
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-class DecisionResponse
+enum class DecisionResponse {
+
+    PERMITTED,
+    DENIED;
+
+    fun isPermitted() : Boolean {
+        return this == PERMITTED
+    }
+
+    fun isDenied() : Boolean {
+        return this == DENIED
+    }
+
+}

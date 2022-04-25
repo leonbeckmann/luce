@@ -72,7 +72,8 @@ internal class PolicyDecisionPointTest {
             LuceRight("example")
         )
 
-        PolicyDecisionPoint.requestDecision(request)
+        val decision = PolicyDecisionPoint.requestDecision(request)
+        assert(decision.isPermitted())
 
     }
 
