@@ -4,6 +4,7 @@ import core.control_flow_model.messages.DecisionRequest
 import core.control_flow_model.messages.DecisionResponse
 import core.exceptions.LuceException
 import core.logic.PolicyEvaluator
+import core.usage_decision_process.SessionPip.SessionIdentifier
 import core.usage_decision_process.UsageSession
 import it.unibo.tuprolog.solve.Solution
 import it.unibo.tuprolog.solve.SolveOptions
@@ -18,6 +19,8 @@ class PolicyDecisionPoint {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(PolicyDecisionPoint::class.java)
+
+        // TODO improve Session State handling
 
         /**
          * PDP logic: PEP requests PDP decision based on policy evaluation.
@@ -40,7 +43,7 @@ class PolicyDecisionPoint {
             val sessionId =
                 request.luceObject.identity.toString() + request.luceSubject.identity.toString() + request.luceRight.id
 
-            // TODO catch exception for invalid state and return negative response due to already in use
+            // TODO catch exception for invalid state and return negative response 'already in use'
             val session = getSession(sessionId, UsageSession.State.Initial)
 
             // feed tryAccess
@@ -190,22 +193,13 @@ class PolicyDecisionPoint {
                 ?: throw LuceException("PIP with identifier=$pipIdentifier is not registered")
         }
 
-        private fun getSession(sessionId: String, expectedState: UsageSession.State) : UsageSession {
+        private fun getSession(sessionId: String, expectedState: UsageSession.State): UsageSession {
 
             // get session PIP
             val sessionPip = getPip("usage_session")
 
             // get session
-            val session = sessionPip.queryInformation(sessionId) as UsageSession
-
-            // check expected state, on mismatch throw exception
-            if (session.state != expectedState) {
-                val state = session.state
-                session.unlock()
-                throw LuceException("Usage session (current state=$state) is not in expected state=$expectedState")
-            }
-
-            return session
+            return sessionPip.queryInformation(SessionIdentifier(sessionId, expectedState)) as UsageSession
         }
 
     }
