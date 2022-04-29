@@ -1,7 +1,6 @@
 package core.control_flow_model.components
 
-import core.control_flow_model.messages.DecisionRequest
-import core.control_flow_model.messages.DecisionResponse
+import core.control_flow_model.messages.*
 import core.exceptions.InUseException
 import core.exceptions.LuceException
 import core.logic.PolicyEvaluator
@@ -83,6 +82,7 @@ class PolicyDecisionPoint {
                     session.feedEvent(UsageSession.Event.PermitAccess)
                     assert(session.state == UsageSession.State.Accessing)
                     session.bindToPolicy(policy)
+                    session.bindToListener(request.listener)
 
                     // TODO UR2
 
@@ -185,8 +185,14 @@ class PolicyDecisionPoint {
                         LOG.debug("Revocation resulted in solution=$revokeSolution")
                     }
 
+                    val listener = session.listener!!
+
                     // delete session
                     SessionPip.finishLock(session)
+
+                    // notify listener
+                    // TODO logic
+                   listener.onRevocation(RevocationResponse())
                 }
             }
         }
@@ -196,8 +202,47 @@ class PolicyDecisionPoint {
          *
          * Calling this function corresponds with the endAccess action.
          */
-        fun endUsage() {
-            // TODO
+        fun <Sid, Oid> endUsage(request: EndRequest<Sid, Oid>) : EndResponse {
+
+            if (LOG.isDebugEnabled) {
+                LOG.debug("Finish usage for " +
+                        "subject=${request.luceSubject.identity}, " +
+                        "object=${request.luceObject.identity}, " +
+                        "right=${request.luceRight.id}"
+                )
+            }
+
+            val sessionId =
+                request.luceObject.identity.toString() + request.luceSubject.identity.toString() + request.luceRight.id
+
+            // get session and assert state = accessing
+            val session = SessionPip.getLockedSession(sessionId, UsageSession.State.Accessing)
+            assert(session.state == UsageSession.State.Accessing)
+            val policy = session.policy ?: throw LuceException("Missing policy for finishing usage session=$sessionId")
+
+            // re-evaluate policy
+            if (LOG.isTraceEnabled) {
+                LOG.trace("Retrieved policy=$policy from session")
+                LOG.trace("Start post-access policy evaluation")
+            }
+
+            // revoke the usage on failure
+            session.feedEvent(UsageSession.Event.EndAccess)
+            assert(session.state == UsageSession.State.End)
+            val endSolution = PolicyEvaluator.evaluate(
+                policy.postAccessEnded,
+                SolveOptions.DEFAULT
+            )
+
+            if (LOG.isDebugEnabled){
+                LOG.debug("Finishing  usage resulted in solution=$endSolution")
+            }
+
+            // end usage
+            SessionPip.finishLock(session)
+
+            // TODO logic
+            return EndResponse()
         }
 
     }

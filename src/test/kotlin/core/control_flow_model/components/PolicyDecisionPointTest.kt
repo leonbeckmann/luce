@@ -4,6 +4,8 @@ import core.admin.LuceObject
 import core.admin.LuceRight
 import core.admin.LuceSubject
 import core.control_flow_model.messages.DecisionRequest
+import core.control_flow_model.messages.EndRequest
+import core.control_flow_model.messages.RevocationResponse
 import core.logic.PolicyEvaluator
 import core.policies.LucePolicy
 import core.usage_decision_process.SessionPip
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.test.util.ReflectionTestUtils
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 
 internal class PolicyDecisionPointTest {
 
@@ -66,6 +69,12 @@ internal class PolicyDecisionPointTest {
                 postAccessEnded = Truth.TRUE,
                 postAccessRevoked = Truth.TRUE
             )
+        }
+    }
+
+    class ExamplePep(private val latch : CountDownLatch) : PolicyEnforcementPoint {
+        override fun onRevocation(response: RevocationResponse) {
+            latch.countDown()
         }
     }
 
@@ -126,16 +135,15 @@ internal class PolicyDecisionPointTest {
 
         assert(sessions.isEmpty())
 
+        val o = ExampleObject("object1", "subject1")
+        val s = ExampleSubject("subject1", "root")
+        val r = LuceRight("example")
+
         // make decision
-        val request = DecisionRequest(
-            ExampleSubject("object1", "subject1"),
-            ExampleObject("subject1", "root"),
-            LuceRight("example")
-        )
+        val request = DecisionRequest(s, o, r, ExamplePep(CountDownLatch(0)))
         val decision = PolicyDecisionPoint.requestDecision(request)
         assert(decision.isDenied())
         assert(sessions.isEmpty())
-
     }
 
     @Test
@@ -146,12 +154,13 @@ internal class PolicyDecisionPointTest {
 
         assert(sessions.isEmpty())
 
+        val o = ExampleObject("object1", "subject1")
+        val s = ExampleSubject("subject1", "root")
+        val r = LuceRight("example")
+
         // make decision
-        val request = DecisionRequest(
-            ExampleSubject("object1", "subject1"),
-            ExampleObject("subject1", "root"),
-            LuceRight("example")
-        )
+        val latch = CountDownLatch(1)
+        val request = DecisionRequest(s, o, r, ExamplePep(latch))
         val decision = PolicyDecisionPoint.requestDecision(request)
         assert(decision.isPermitted())
         assert(sessions.size == 1)
@@ -159,8 +168,8 @@ internal class PolicyDecisionPointTest {
         val session = sessions.iterator().next().value
         assert(session.state == UsageSession.State.Accessing)
 
-        // sleep until re-evaluation is over
-        Thread.sleep(800)
+        // sleep until re-evaluation is over and onRevocation was called on the PEP
+        latch.await()
 
         // ensure that session has been revoked
         assert(sessions.isEmpty())
@@ -177,12 +186,14 @@ internal class PolicyDecisionPointTest {
 
         assert(sessions.isEmpty())
 
+        val o = ExampleObject("object1", "subject1")
+        val s = ExampleSubject("subject1", "root")
+        val r = LuceRight("example")
+
         // make decision
-        val request = DecisionRequest(
-            ExampleSubject("object1", "subject1"),
-            ExampleObject("subject1", "root"),
-            LuceRight("example")
-        )
+        val latch = CountDownLatch(1)
+        val request = DecisionRequest(s, o, r, ExamplePep(latch))
+
         val decision = PolicyDecisionPoint.requestDecision(request)
         assert(decision.isPermitted())
         assert(sessions.size == 1)
@@ -197,7 +208,10 @@ internal class PolicyDecisionPointTest {
         assert(sessions.size == 1)
         assert(session.state == UsageSession.State.Accessing)
         assert(sessions.iterator().next().value == session)
+        assert(latch.count == 1L)
 
+        // end access
+        val endRequest = EndRequest(s, o, r)
+        PolicyDecisionPoint.endUsage(endRequest)
     }
-
 }

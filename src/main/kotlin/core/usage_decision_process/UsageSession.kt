@@ -1,5 +1,6 @@
 package core.usage_decision_process
 
+import core.control_flow_model.components.PolicyEnforcementPoint
 import core.control_flow_model.components.ReevaluationTimer
 import core.policies.LucePolicy
 import java.util.concurrent.locks.ReentrantLock
@@ -65,6 +66,15 @@ class UsageSession(val id: String) {
         }
     }
 
+    var listener: PolicyEnforcementPoint? = null
+        private set
+
+    fun bindToListener(listener: PolicyEnforcementPoint) {
+        if (state == State.Accessing) {
+            this.listener = listener
+        }
+    }
+
     var reevaluationTimer: ReevaluationTimer? = null
 
     fun cancelTimer() {
@@ -75,6 +85,7 @@ class UsageSession(val id: String) {
     fun reset() {
         this.state = State.Initial
         this.policy = null
+        this.listener = null
     }
 
 
