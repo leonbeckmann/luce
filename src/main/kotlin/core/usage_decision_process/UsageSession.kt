@@ -9,7 +9,7 @@ import java.util.concurrent.locks.ReentrantLock
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-class UsageSession {
+class UsageSession(val id: String) {
 
     /**
      * Usage Session States

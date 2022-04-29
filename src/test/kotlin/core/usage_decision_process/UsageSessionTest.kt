@@ -10,7 +10,7 @@ internal class UsageSessionTest {
         s1: UsageSession.State,
         event: UsageSession.Event
     ) {
-        val session = UsageSession()
+        val session = UsageSession("id")
         ReflectionTestUtils.setField(session, "state", s0)
         try {
             session.lock()
@@ -26,7 +26,7 @@ internal class UsageSessionTest {
     fun usageSessionTest() {
 
         // check initial state
-        val session = UsageSession()
+        val session = UsageSession("id")
         assert(session.state == UsageSession.State.Initial)
 
         // check transitions

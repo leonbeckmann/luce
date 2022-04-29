@@ -2,9 +2,10 @@ package core.control_flow_model.components
 
 import core.control_flow_model.messages.DecisionRequest
 import core.control_flow_model.messages.DecisionResponse
+import core.exceptions.InUseException
 import core.exceptions.LuceException
 import core.logic.PolicyEvaluator
-import core.usage_decision_process.SessionPip.SessionIdentifier
+import core.usage_decision_process.SessionPip
 import core.usage_decision_process.UsageSession
 import it.unibo.tuprolog.solve.Solution
 import it.unibo.tuprolog.solve.SolveOptions
@@ -19,8 +20,6 @@ class PolicyDecisionPoint {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(PolicyDecisionPoint::class.java)
-
-        // TODO improve Session State handling
 
         /**
          * PDP logic: PEP requests PDP decision based on policy evaluation.
@@ -43,11 +42,19 @@ class PolicyDecisionPoint {
             val sessionId =
                 request.luceObject.identity.toString() + request.luceSubject.identity.toString() + request.luceRight.id
 
-            // TODO catch exception for invalid state and return negative response 'already in use'
-            val session = getSession(sessionId, UsageSession.State.Initial)
+            // catch exception for invalid state and return negative response 'already in use'
+            val session = try {
+                SessionPip.getLockedSession(sessionId, UsageSession.State.Initial)
+            } catch (e: InUseException) {
+                if (LOG.isDebugEnabled) {
+                    LOG.debug("Session with id=$sessionId is already in use")
+                }
+                return DecisionResponse.IN_USE
+            }
 
             // feed tryAccess
             session.feedEvent(UsageSession.Event.TryAccess)
+            assert(session.state == UsageSession.State.Requesting)
 
             // get policy from PMP
             val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
@@ -74,6 +81,7 @@ class PolicyDecisionPoint {
 
                     // on success, permit access and bind policy to session
                     session.feedEvent(UsageSession.Event.PermitAccess)
+                    assert(session.state == UsageSession.State.Accessing)
                     session.bindToPolicy(policy)
 
                     // TODO UR2
@@ -86,7 +94,7 @@ class PolicyDecisionPoint {
                     }
 
                     // unlock session for further usage
-                    session.unlock()
+                    SessionPip.finishLock(session)
 
                     // return positive decision
                     return DecisionResponse.PERMITTED
@@ -106,7 +114,8 @@ class PolicyDecisionPoint {
 
                     // on failure, deny access and delete usage session
                     session.feedEvent(UsageSession.Event.DenyAccess)
-                    getPip("usage_session").updateInformation(sessionId, null)
+                    assert(session.state == UsageSession.State.Denied)
+                    SessionPip.finishLock(session)
 
                     // return negative decision
                     return DecisionResponse.DENIED
@@ -125,7 +134,8 @@ class PolicyDecisionPoint {
             }
 
             // get session and assert state = accessing
-            val session = getSession(sessionId, UsageSession.State.Accessing)
+            val session = SessionPip.getLockedSession(sessionId, UsageSession.State.Accessing)
+            assert(session.state == UsageSession.State.Accessing)
             val policy = session.policy ?: throw LuceException("Missing policy for ongoing session=$sessionId")
 
             // re-evaluate policy
@@ -147,7 +157,8 @@ class PolicyDecisionPoint {
                     }
 
                     // unlock session for further usage
-                    session.unlock()
+                    assert(session.state == UsageSession.State.Accessing)
+                    SessionPip.finishLock(session)
                 }
                 else -> {
                     if (solution is Solution.Halt) {
@@ -164,6 +175,7 @@ class PolicyDecisionPoint {
 
                     // revoke the usage on failure
                     session.feedEvent(UsageSession.Event.RevokeAccess)
+                    assert(session.state == UsageSession.State.Revoked)
                     val revokeSolution = PolicyEvaluator.evaluate(
                         policy.postAccessRevoked,
                         SolveOptions.DEFAULT
@@ -174,7 +186,7 @@ class PolicyDecisionPoint {
                     }
 
                     // delete session
-                    getPip("usage_session").updateInformation(sessionId, null)
+                    SessionPip.finishLock(session)
                 }
             }
         }
@@ -186,20 +198,6 @@ class PolicyDecisionPoint {
          */
         fun endUsage() {
             // TODO
-        }
-
-        private fun getPip(pipIdentifier: String): PolicyInformationPoint {
-            return ComponentRegistry.policyInformationPoints[pipIdentifier]
-                ?: throw LuceException("PIP with identifier=$pipIdentifier is not registered")
-        }
-
-        private fun getSession(sessionId: String, expectedState: UsageSession.State): UsageSession {
-
-            // get session PIP
-            val sessionPip = getPip("usage_session")
-
-            // get session
-            return sessionPip.queryInformation(SessionIdentifier(sessionId, expectedState)) as UsageSession
         }
 
     }

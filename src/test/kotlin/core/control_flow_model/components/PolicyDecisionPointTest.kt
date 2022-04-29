@@ -97,13 +97,9 @@ internal class PolicyDecisionPointTest {
                 )
             )
 
-            // register PIPs
-            val sessionPip = SessionPip()
-            ComponentRegistry.addPolicyInformationPoint("usage_session", sessionPip)
-
             // access sessions for test
             @Suppress("UNCHECKED_CAST")
-            sessions = ReflectionTestUtils.getField(sessionPip,"sessions") as ConcurrentHashMap<String, UsageSession>
+            sessions = ReflectionTestUtils.getField(SessionPip,"sessions") as ConcurrentHashMap<String, UsageSession>
         }
     }
 

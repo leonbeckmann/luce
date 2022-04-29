@@ -1,32 +1,24 @@
 package core.usage_decision_process
 
-import core.control_flow_model.components.PolicyInformationPoint
+import core.exceptions.InUseException
 import core.exceptions.LuceException
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Policy Information Point, providing usage session information to the PDP
+ * Usage Session PIP, providing usage session information to the PDP
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-class SessionPip : PolicyInformationPoint {
+object SessionPip {
 
-    data class SessionIdentifier(val sessionId : String, val expectedState: UsageSession.State?)
-
+    private val LOG = LoggerFactory.getLogger(SessionPip::class.java)
     private val sessions = ConcurrentHashMap<String, UsageSession>()
 
     /**
-     * Called by the PDP, returns a (locked) usage session
+     * Called by the PDP, returns a (locked) usage session in the expected state
      */
-    override fun queryInformation(identifier: Any): UsageSession {
-
-        if (identifier !is SessionIdentifier) {
-            throw LuceException("Invalid identifier type in queryInformation: SessionIdentifier expected")
-        }
-
-        val id = identifier.sessionId
-        val expectedState = identifier.expectedState!!
+    fun getLockedSession(id: String, expectedState: UsageSession.State): UsageSession {
 
         if (LOG.isTraceEnabled) {
             LOG.trace("Query usage session with id=$id")
@@ -35,12 +27,12 @@ class SessionPip : PolicyInformationPoint {
         // first check if the usage session already exists, otherwise create a new one
         val session = when(expectedState) {
             UsageSession.State.Initial -> {
-                // expect initial session, which might already exist but must be retested
+                // expect initial session, which might already exist but must be reset
                 sessions.getOrPut(id) {
                     if (LOG.isTraceEnabled) {
                         LOG.trace("Put new usage session with id=$id")
                     }
-                    UsageSession()
+                    UsageSession(id)
                 }
             }
             else -> {
@@ -56,54 +48,59 @@ class SessionPip : PolicyInformationPoint {
         if (session.state != expectedState) {
             val state = session.state
             session.unlock()
+
+            // check if session is used for other access
+            if (session.state == UsageSession.State.Accessing) {
+                throw InUseException("Session with id=$id is currently used")
+            }
+
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
                     "state=$expectedState")
         }
 
+        // return locked session
         return session
     }
 
     /**
-     * Called by the PDP after the usage is revoked or ended
+     * Called by the PDP to unlock the session again
      *
-     * Remove the session from sessions or reset it to initial state when there are waiters available
+     * When the state is Error, End, Revoked or Denied, the session is removed or reset
      */
-    override fun updateInformation(identifier: Any, newValue: Any?) {
-
-        if (identifier !is String) {
-            throw LuceException("Invalid identifier type in updateInformation: String expected")
-        }
-
-        if (LOG.isTraceEnabled) {
-            LOG.trace("Remove usage session with id=$identifier")
-        }
-
-        // get session from sessions map
-        val session = sessions[identifier] ?: throw LuceException("Session with id=$identifier unknown")
+    fun finishLock(session: UsageSession) {
 
         // ensure we have the current lock, so we are currently responsible for the session
         if (!session.lock.isHeldByCurrentThread)
-            throw LuceException("Session with id=$identifier not held by current thread")
+            throw LuceException("Session with id=${session.id} not held by current thread")
+
+        if (session.state == UsageSession.State.Accessing) {
+            // simply unlock session for further usage
+            session.unlock()
+            return
+        }
+
+        // remove finished sessions from registry
+        if (LOG.isTraceEnabled) {
+            LOG.trace("Remove usage session with id=${session.id}")
+        }
 
         // cancel reevaluation timer
         session.cancelTimer()
 
         // remove the session from the map to avoid race conditions that could occur after we check for waiters
-        sessions.remove(identifier)
+        sessions.remove(session.id)
 
         // check if there are other waiters, if so reset the session to initial config
         if (session.lock.hasQueuedThreads()) {
             if (LOG.isTraceEnabled) {
-                LOG.trace("Session with id=$identifier has active waiters - only reset the session")
+                LOG.trace("Session with id=${session.id} has active waiters - only reset the session")
             }
             session.reset()
-            sessions[identifier] = session
-            session.unlock()
+            sessions[session.id] = session
         }
-    }
 
-    companion object {
-        private val LOG = LoggerFactory.getLogger(SessionPip::class.java)
-    }
+        // unlock the session
+        session.unlock()
 
+    }
 }

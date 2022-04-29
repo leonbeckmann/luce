@@ -8,7 +8,8 @@ package core.control_flow_model.messages
 enum class DecisionResponse {
 
     PERMITTED,
-    DENIED;
+    DENIED,
+    IN_USE;
 
     fun isPermitted() : Boolean {
         return this == PERMITTED
@@ -16,6 +17,10 @@ enum class DecisionResponse {
 
     fun isDenied() : Boolean {
         return this == DENIED
+    }
+
+    fun isInUse() : Boolean {
+        return this == IN_USE
     }
 
 }
