@@ -31,7 +31,7 @@ internal class UsageSessionTest {
 
         // check initial state
         val session = UsageSession("id")
-        assert(session.state == UsageSession.Initial)
+        assert(session.state == UsageSession.State.Initial)
 
         val policy = LucePolicy(Truth.TRUE, Truth.TRUE, Truth.TRUE, 5, Truth.TRUE, Truth.TRUE)
         val pep = object : PolicyEnforcementPoint {
@@ -39,57 +39,57 @@ internal class UsageSessionTest {
         }
 
         // check transitions
-        sessionTestHelper(UsageSession.Initial, UsageSession.Requesting, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Initial, UsageSession.Error, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Initial, UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Initial, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Initial, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Initial, UsageSession.State.Requesting, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Initial, UsageSession.State.Error, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Initial, UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Initial, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Initial, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.Requesting, UsageSession.Error, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Requesting, UsageSession.Denied, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Requesting, UsageSession.Accessing(policy, pep, null),
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Requesting, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Requesting, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Requesting, UsageSession.State.Error, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Requesting, UsageSession.State.Denied, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Requesting, UsageSession.State.Accessing(policy, pep, null),
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Requesting, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Requesting, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.Denied, UsageSession.Error, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Denied, UsageSession.Error, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Denied, UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Denied, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Denied, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Denied, UsageSession.State.Error, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Denied, UsageSession.State.Error, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Denied, UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Denied, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Denied, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.Accessing(policy, pep, null), UsageSession.Error,
-            UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Accessing(policy, pep, null), UsageSession.Error,
-            UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Accessing(policy, pep, null), UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Accessing(policy, pep, null), UsageSession.End,
-            UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Accessing(policy, pep, null), UsageSession.Revoked,
-            UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Accessing(policy, pep, null), UsageSession.State.Error,
+            UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Accessing(policy, pep, null), UsageSession.State.Error,
+            UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Accessing(policy, pep, null), UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Accessing(policy, pep, null), UsageSession.State.End,
+            UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Accessing(policy, pep, null), UsageSession.State.Revoked,
+            UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.End, UsageSession.Error, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.End, UsageSession.Error, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.End, UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.End, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.End, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.End, UsageSession.State.Error, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.End, UsageSession.State.Error, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.End, UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.End, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.End, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.Revoked, UsageSession.Error, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Revoked, UsageSession.Error, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Revoked, UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Revoked, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Revoked, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Revoked, UsageSession.State.Error, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Revoked, UsageSession.State.Error, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Revoked, UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Revoked, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Revoked, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
 
-        sessionTestHelper(UsageSession.Error, UsageSession.Error, UsageSession.TryAccess)
-        sessionTestHelper(UsageSession.Error, UsageSession.Error, UsageSession.DenyAccess)
-        sessionTestHelper(UsageSession.Error, UsageSession.Error,
-            UsageSession.PermitAccess(policy, pep, null))
-        sessionTestHelper(UsageSession.Error, UsageSession.Error, UsageSession.EndAccess)
-        sessionTestHelper(UsageSession.Error, UsageSession.Error, UsageSession.RevokeAccess)
+        sessionTestHelper(UsageSession.State.Error, UsageSession.State.Error, UsageSession.Event.TryAccess)
+        sessionTestHelper(UsageSession.State.Error, UsageSession.State.Error, UsageSession.Event.DenyAccess)
+        sessionTestHelper(UsageSession.State.Error, UsageSession.State.Error,
+            UsageSession.Event.PermitAccess(policy, pep, null))
+        sessionTestHelper(UsageSession.State.Error, UsageSession.State.Error, UsageSession.Event.EndAccess)
+        sessionTestHelper(UsageSession.State.Error, UsageSession.State.Error, UsageSession.Event.RevokeAccess)
     }
 }

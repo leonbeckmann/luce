@@ -27,17 +27,17 @@ internal class SessionPipTest {
         assert(session.lock.isHeldByCurrentThread)
         assert(!session.lock.hasQueuedThreads())
         assert(sessions.size == 1)
-        assert(session.state is UsageSession.Initial)
-        session.feedEvent(UsageSession.TryAccess)
-        assert(session.state is UsageSession.Requesting)
-        session.feedEvent(UsageSession.PermitAccess(
+        assert(session.state is UsageSession.State.Initial)
+        session.feedEvent(UsageSession.Event.TryAccess)
+        assert(session.state is UsageSession.State.Requesting)
+        session.feedEvent(UsageSession.Event.PermitAccess(
             LucePolicy(Truth.TRUE, Truth.TRUE, Truth.TRUE, 5, Truth.TRUE, Truth.TRUE),
             object : PolicyEnforcementPoint {
                 override fun onRevocation(response: RevocationResponse) {}
             },
             null
         ))
-        assert(session.state is UsageSession.Accessing)
+        assert(session.state is UsageSession.State.Accessing)
         SessionPip.finishLock(session)
         assert(sessions.size == 1)
 
@@ -54,9 +54,9 @@ internal class SessionPipTest {
         // lock again and remove
         session = SessionPip.getLockedContinuousSession("session1")
         assert(sessions.size == 1)
-        assert(session.state is UsageSession.Accessing)
-        session.feedEvent(UsageSession.EndAccess)
-        assert(session.state is UsageSession.End)
+        assert(session.state is UsageSession.State.Accessing)
+        session.feedEvent(UsageSession.Event.EndAccess)
+        assert(session.state is UsageSession.State.End)
         SessionPip.finishLock(session)
         assert(sessions.isEmpty())
 
@@ -78,7 +78,7 @@ internal class SessionPipTest {
         SessionPip.finishLock(newSession)
         assert(sessions.size == 1) // not removed due to waiter
         assert(newSession == sessions.iterator().next().value)
-        assert(newSession.state is UsageSession.Initial)
+        assert(newSession.state is UsageSession.State.Initial)
     }
 
 }

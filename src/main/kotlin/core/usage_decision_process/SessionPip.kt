@@ -36,17 +36,17 @@ object SessionPip {
         session.lock()
 
         // check expected state
-        if (session.state !is UsageSession.Initial) {
+        if (session.state !is UsageSession.State.Initial) {
             val state = session.state
             session.unlock()
 
             // check if session is used for other access
-            if (session.state is UsageSession.Accessing) {
+            if (session.state is UsageSession.State.Accessing) {
                 throw InUseException("Session with id=$id is currently used")
             }
 
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
-                    "state=${UsageSession.Initial}")
+                    "state=${UsageSession.State.Initial}")
         }
 
         return session
@@ -68,12 +68,12 @@ object SessionPip {
         session.lock()
 
         // check expected state
-        if (session.state !is UsageSession.Accessing) {
+        if (session.state !is UsageSession.State.Accessing) {
             val state = session.state
             session.unlock()
 
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
-                    "state=${UsageSession.Accessing}")
+                    "state=${UsageSession.State.Accessing}")
         }
 
         return session
@@ -90,7 +90,7 @@ object SessionPip {
         if (!session.lock.isHeldByCurrentThread)
             throw LuceException("Session with id=${session.id} not held by current thread")
 
-        if (session.state is UsageSession.Accessing) {
+        if (session.state is UsageSession.State.Accessing) {
             // simply unlock session for further usage
             session.unlock()
             return

@@ -15,52 +15,42 @@ class UsageSession(val id: String) {
     /**
      * Usage Session States
      */
-    sealed class State(val id: String)
-
-    object Initial : State("initial")
-
-    object Requesting : State("requesting")
-
-    object Denied : State("denied")
-
-    data class Accessing(
-        val policy: LucePolicy,
-        val listener: PolicyEnforcementPoint,
-        var reevaluationTimer: ReevaluationTimer?
-    ) : State("accessing") {
-        companion object {
-            const val id = "accessing"
+    sealed class State(val id: String) {
+        object Initial : State("initial")
+        object Requesting : State("requesting")
+        object Denied : State("denied")
+        data class Accessing(
+            val policy: LucePolicy,
+            val listener: PolicyEnforcementPoint,
+            var reevaluationTimer: ReevaluationTimer?
+        ) : State("accessing") {
+            companion object {
+                const val id = "accessing"
+            }
         }
+        object Revoked : State("revoked")
+        object End : State("end")
+        object Error : State("error")
     }
-
-    object Revoked : State("revoked")
-
-    object End : State("end")
-
-    object Error : State("error")
 
     /**
      * FSM event to trigger transitions
      */
-    sealed class Event(val id: String)
-
-    object TryAccess : Event("try_access")
-
-    object DenyAccess : Event("deny_access")
-
-    data class PermitAccess(
-        val policy: LucePolicy,
-        val listener: PolicyEnforcementPoint,
-        var reevaluationTimer: ReevaluationTimer?
-    ) : Event("permit_access") {
-        companion object {
-            const val id = "permit_access"
+    sealed class Event(val id: String) {
+        object TryAccess : Event("try_access")
+        object DenyAccess : Event("deny_access")
+        data class PermitAccess(
+            val policy: LucePolicy,
+            val listener: PolicyEnforcementPoint,
+            var reevaluationTimer: ReevaluationTimer?
+        ) : Event("permit_access") {
+            companion object {
+                const val id = "permit_access"
+            }
         }
+        object RevokeAccess : Event("revoke_access")
+        object EndAccess : Event("end_access")
     }
-
-    object RevokeAccess : Event("revoke_access")
-
-    object EndAccess : Event("end_access")
 
     /**
      * FSM transition, triggered by fsm event
@@ -74,17 +64,17 @@ class UsageSession(val id: String) {
     /**
      * Current session state
      */
-    var state: State = Initial
+    var state: State = State.Initial
         private set
 
     fun reset() {
-        this.state = Initial
+        this.state = State.Initial
     }
 
     fun cancelTimer() {
-        if (state is Accessing) {
-            (state as Accessing).reevaluationTimer?.cancel()
-            (state as Accessing).reevaluationTimer = null
+        if (state is State.Accessing) {
+            (state as State.Accessing).reevaluationTimer?.cancel()
+            (state as State.Accessing).reevaluationTimer = null
         }
     }
 
@@ -99,37 +89,37 @@ class UsageSession(val id: String) {
     private data class TransitionKey(val state: String, val event: String)
     private val transitions = HashMap<TransitionKey, Transition>()
     private val defaultTransition: Transition = Transition {
-        Error
+        State.Error
     }
 
     init {
         // (Initial, TryAccess) -> Requesting
-        transitions[TransitionKey(Initial.id, TryAccess.id)] = Transition {
-            Requesting
+        transitions[TransitionKey(State.Initial.id, Event.TryAccess.id)] = Transition {
+            State.Requesting
         }
 
         // (Requesting, DenyAccess) -> Denied
-        transitions[TransitionKey(Requesting.id, DenyAccess.id)] = Transition {
-            Denied
+        transitions[TransitionKey(State.Requesting.id, Event.DenyAccess.id)] = Transition {
+            State.Denied
         }
 
         // (Requesting, PermitAccess) -> Accessing
-        transitions[TransitionKey(Requesting.id, PermitAccess.id)] = Transition {
-            if (it is PermitAccess) {
-                Accessing(it.policy, it.listener, it.reevaluationTimer)
+        transitions[TransitionKey(State.Requesting.id, Event.PermitAccess.id)] = Transition {
+            if (it is Event.PermitAccess) {
+                State.Accessing(it.policy, it.listener, it.reevaluationTimer)
             } else {
-                Error
+                State.Error
             }
         }
 
         // (Accessing, RevokeAccess) -> Revoked
-        transitions[TransitionKey(Accessing.id, RevokeAccess.id)] = Transition {
-            Revoked
+        transitions[TransitionKey(State.Accessing.id, Event.RevokeAccess.id)] = Transition {
+            State.Revoked
         }
 
         // (Accessing, EndAccess) -> End
-        transitions[TransitionKey(Accessing.id, EndAccess.id)] = Transition {
-            End
+        transitions[TransitionKey(State.Accessing.id, Event.EndAccess.id)] = Transition {
+            State.End
         }
     }
 
