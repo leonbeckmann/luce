@@ -2,7 +2,9 @@ package core.logic
 
 import core.control_flow_model.components.ComponentRegistry
 import core.control_flow_model.components.PolicyInformationPoint
+import it.unibo.tuprolog.core.Atom
 import it.unibo.tuprolog.dsl.prolog
+import it.unibo.tuprolog.core.List as PrologList
 import it.unibo.tuprolog.solve.SolveOptions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -14,7 +16,8 @@ internal class DefaultLibraryTest {
             return 3
         }
 
-        override fun updateInformation(identifier: Any, newValue: Any?) {}
+        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
+        override fun updateInformation(identifier: Any, description: String): Boolean = true
     }
 
     class RealPip : PolicyInformationPoint {
@@ -22,7 +25,8 @@ internal class DefaultLibraryTest {
             return 1.5
         }
 
-        override fun updateInformation(identifier: Any, newValue: Any?) {}
+        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
+        override fun updateInformation(identifier: Any, description: String): Boolean = true
     }
 
     class TruthPip : PolicyInformationPoint {
@@ -30,7 +34,8 @@ internal class DefaultLibraryTest {
             return true
         }
 
-        override fun updateInformation(identifier: Any, newValue: Any?) {}
+        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
+        override fun updateInformation(identifier: Any, description: String): Boolean = true
     }
 
     class StringPip : PolicyInformationPoint {
@@ -38,7 +43,8 @@ internal class DefaultLibraryTest {
             return "a"
         }
 
-        override fun updateInformation(identifier: Any, newValue: Any?) {}
+        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
+        override fun updateInformation(identifier: Any, description: String): Boolean = true
     }
 
     class StringListPip : PolicyInformationPoint {
@@ -46,7 +52,8 @@ internal class DefaultLibraryTest {
             return listOf("a", "b", "c")
         }
 
-        override fun updateInformation(identifier: Any, newValue: Any?) {}
+        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
+        override fun updateInformation(identifier: Any, description: String): Boolean = true
     }
 
     companion object {
@@ -64,9 +71,32 @@ internal class DefaultLibraryTest {
     }
 
     @Test
+    fun testEmptyList() {
+        val solution = PolicyEvaluator.evaluate(
+            prolog { "list_empty"(PrologList.empty()) and "not"("list_empty"(PrologList.of(Atom.of("a")))) },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
+
+    @Test
+    fun testListIntersection() {
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "intersection"(PrologList.empty(), PrologList.of(Atom.of("a")), PrologList.empty()) and
+                "intersection"(PrologList.of(Atom.of("a"), Atom.of("b")), PrologList.of(Atom.of("c"),
+                    Atom.of("d")), PrologList.empty()) and "intersection"(PrologList.of(Atom.of("a"),
+                    Atom.of("b")), PrologList.of(Atom.of("b"), Atom.of("c")), PrologList.of(Atom.of("b")))
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
+
+    @Test
     fun testResolveInt() {
         val solution = PolicyEvaluator.evaluate(
-            prolog { "resolveInt"("test_pip_int:attr1", "X") and "="("X", 3) },
+            prolog { "resolve_int"("test_pip_int:attr1", "X") and "="("X", 3) },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
@@ -75,7 +105,7 @@ internal class DefaultLibraryTest {
     @Test
     fun testResolveReal() {
         val solution = PolicyEvaluator.evaluate(
-            prolog { "resolveReal"("test_pip_real:attr1", "X") and "="("X", 1.5) },
+            prolog { "resolve_real"("test_pip_real:attr1", "X") and "="("X", 1.5) },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
@@ -84,7 +114,7 @@ internal class DefaultLibraryTest {
     @Test
     fun testResolveTruth() {
         val solution = PolicyEvaluator.evaluate(
-            prolog { "resolveTruth"("test_pip_truth:attr1", "X") and "="("X", true) },
+            prolog { "resolve_truth"("test_pip_truth:attr1", "X") and "="("X", true) },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
@@ -93,7 +123,7 @@ internal class DefaultLibraryTest {
     @Test
     fun testResolveString() {
         val solution = PolicyEvaluator.evaluate(
-            prolog { "resolveString"("test_pip_string:attr1", "X") and "="("X", "a")},
+            prolog { "resolve_string"("test_pip_string:attr1", "X") and "="("X", "a")},
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
@@ -102,7 +132,16 @@ internal class DefaultLibraryTest {
     @Test
     fun testResolveStringList() {
         val solution = PolicyEvaluator.evaluate(
-            prolog { "resolveStringList"("test_pip_string_list:attr1", "X") and "member"("c", "X")},
+            prolog { "resolve_string_list"("test_pip_string_list:attr1", "X") and "member"("c", "X")},
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
+
+    @Test
+    fun testPipIdentifier() {
+        val solution = PolicyEvaluator.evaluate(
+            prolog { "pip_identifier"("a", "b", "a:b") },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)

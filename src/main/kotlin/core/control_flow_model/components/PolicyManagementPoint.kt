@@ -9,6 +9,7 @@ import core.policies.LucePolicy
  */
 interface PolicyManagementPoint {
 
+    // TODO usually policy depends on object and right
     fun pullPolicy() : LucePolicy?
 
 }
