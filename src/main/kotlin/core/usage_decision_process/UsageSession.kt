@@ -15,32 +15,52 @@ class UsageSession(val id: String) {
     /**
      * Usage Session States
      */
-    enum class State {
-        Initial,
-        Requesting,
-        Denied,
-        Accessing,
-        Revoked,
-        End,
-        Error
+    sealed class State(val id: String)
+
+    object Initial : State("initial")
+
+    object Requesting : State("requesting")
+
+    object Denied : State("denied")
+
+    data class Accessing(
+        val policy: LucePolicy,
+        val listener: PolicyEnforcementPoint,
+        var reevaluationTimer: ReevaluationTimer?
+    ) : State("accessing") {
+        companion object {
+            const val id = "accessing"
+        }
     }
+
+    object Revoked : State("revoked")
+
+    object End : State("end")
+
+    object Error : State("error")
 
     /**
      * FSM event to trigger transitions
      */
-    enum class Event {
-        TryAccess,
-        PreUpdate,
-        PreDeps,
-        DenyAccess,
-        PermitAccess,
-        OnUpdate,
-        OnDeps,
-        RevokeAccess,
-        EndAccess,
-        PostUpdate,
-        PostDeps
+    sealed class Event(val id: String)
+
+    object TryAccess : Event("try_access")
+
+    object DenyAccess : Event("deny_access")
+
+    data class PermitAccess(
+        val policy: LucePolicy,
+        val listener: PolicyEnforcementPoint,
+        var reevaluationTimer: ReevaluationTimer?
+    ) : Event("permit_access") {
+        companion object {
+            const val id = "permit_access"
+        }
     }
+
+    object RevokeAccess : Event("revoke_access")
+
+    object EndAccess : Event("end_access")
 
     /**
      * FSM transition, triggered by fsm event
@@ -54,40 +74,19 @@ class UsageSession(val id: String) {
     /**
      * Current session state
      */
-    var state: State = State.Initial
+    var state: State = Initial
         private set
-
-    var policy: LucePolicy? = null
-        private set
-
-    fun bindToPolicy(policy: LucePolicy) {
-        if (state == State.Accessing) {
-            this.policy = policy
-        }
-    }
-
-    var listener: PolicyEnforcementPoint? = null
-        private set
-
-    fun bindToListener(listener: PolicyEnforcementPoint) {
-        if (state == State.Accessing) {
-            this.listener = listener
-        }
-    }
-
-    var reevaluationTimer: ReevaluationTimer? = null
-
-    fun cancelTimer() {
-        reevaluationTimer?.cancel()
-        reevaluationTimer = null
-    }
 
     fun reset() {
-        this.state = State.Initial
-        this.policy = null
-        this.listener = null
+        this.state = Initial
     }
 
+    fun cancelTimer() {
+        if (state is Accessing) {
+            (state as Accessing).reevaluationTimer?.cancel()
+            (state as Accessing).reevaluationTimer = null
+        }
+    }
 
     /**
      * Synchronization for fsm
@@ -97,86 +96,45 @@ class UsageSession(val id: String) {
     /**
      * Registered transitions
      */
-    private data class TransitionKey(val state: State, val e: Event)
+    private data class TransitionKey(val state: String, val event: String)
     private val transitions = HashMap<TransitionKey, Transition>()
     private val defaultTransition: Transition = Transition {
-        State.Error
+        Error
     }
 
     init {
         // (Initial, TryAccess) -> Requesting
-        transitions[TransitionKey(State.Initial, Event.TryAccess)] = Transition {
-            State.Requesting
-        }
-
-        // (Requesting, PreUpdate) -> Requesting
-        transitions[TransitionKey(State.Requesting, Event.PreUpdate)] = Transition {
-            State.Requesting
-        }
-
-        // (Requesting, PreDeps) -> Requesting
-        transitions[TransitionKey(State.Requesting, Event.PreDeps)] = Transition {
-            State.Requesting
+        transitions[TransitionKey(Initial.id, TryAccess.id)] = Transition {
+            Requesting
         }
 
         // (Requesting, DenyAccess) -> Denied
-        transitions[TransitionKey(State.Requesting, Event.DenyAccess)] = Transition {
-            State.Denied
+        transitions[TransitionKey(Requesting.id, DenyAccess.id)] = Transition {
+            Denied
         }
 
         // (Requesting, PermitAccess) -> Accessing
-        transitions[TransitionKey(State.Requesting, Event.PermitAccess)] = Transition {
-            State.Accessing
-        }
-
-        // (Denied, PreUpdate) -> Denied
-        transitions[TransitionKey(State.Denied, Event.PreUpdate)] = Transition {
-            State.Denied
-        }
-
-        // (Accessing, OnUpdate) -> Accessing
-        transitions[TransitionKey(State.Accessing, Event.OnUpdate)] = Transition {
-            State.Accessing
-        }
-
-        // (Accessing, OnDeps) -> Accessing
-        transitions[TransitionKey(State.Accessing, Event.OnDeps)] = Transition {
-            State.Accessing
+        transitions[TransitionKey(Requesting.id, PermitAccess.id)] = Transition {
+            if (it is PermitAccess) {
+                Accessing(it.policy, it.listener, it.reevaluationTimer)
+            } else {
+                Error
+            }
         }
 
         // (Accessing, RevokeAccess) -> Revoked
-        transitions[TransitionKey(State.Accessing, Event.RevokeAccess)] = Transition {
-            State.Revoked
+        transitions[TransitionKey(Accessing.id, RevokeAccess.id)] = Transition {
+            Revoked
         }
 
         // (Accessing, EndAccess) -> End
-        transitions[TransitionKey(State.Accessing, Event.EndAccess)] = Transition {
-            State.End
-        }
-
-        // (Revoked, PostUpdate) -> Revoked
-        transitions[TransitionKey(State.Revoked, Event.PostUpdate)] = Transition {
-            State.Revoked
-        }
-
-        // (Revoked, PostDeps) -> Revoked
-        transitions[TransitionKey(State.Revoked, Event.PostDeps)] = Transition {
-            State.Revoked
-        }
-
-        // (End, PostUpdate) -> PostUpdate
-        transitions[TransitionKey(State.End, Event.PostUpdate)] = Transition {
-            State.End
-        }
-
-        // (End, PostDeps) -> End
-        transitions[TransitionKey(State.End, Event.PostDeps)] = Transition {
-            State.End
+        transitions[TransitionKey(Accessing.id, EndAccess.id)] = Transition {
+            End
         }
     }
 
     fun feedEvent(e: Event) {
-        val t = transitions.getOrDefault(TransitionKey(state, e), defaultTransition)
+        val t = transitions.getOrDefault(TransitionKey(state.id, e.id), defaultTransition)
         this.state = t.doTransition(e)
     }
 

@@ -117,7 +117,7 @@ internal class PolicyDecisionPointTest {
 
         // clear timer
         sessions.forEach {
-            it.value.reevaluationTimer?.cancel()
+            it.value.cancelTimer()
         }
 
         // clear sessions
@@ -166,16 +166,14 @@ internal class PolicyDecisionPointTest {
         assert(sessions.size == 1)
 
         val session = sessions.iterator().next().value
-        assert(session.state == UsageSession.State.Accessing)
+        assert(session.state is UsageSession.Accessing)
 
         // sleep until re-evaluation is over and onRevocation was called on the PEP
         latch.await()
 
         // ensure that session has been revoked
         assert(sessions.isEmpty())
-        assert(session.state == UsageSession.State.Revoked)
-        assert(session.reevaluationTimer == null)
-
+        assert(session.state is UsageSession.Revoked)
     }
 
     @Test
@@ -199,14 +197,14 @@ internal class PolicyDecisionPointTest {
         assert(sessions.size == 1)
 
         val session = sessions.iterator().next().value
-        assert(session.state == UsageSession.State.Accessing)
+        assert(session.state is UsageSession.Accessing)
 
         // sleep until re-evaluation is over
         Thread.sleep(800)
 
         // ensure that session is still available
         assert(sessions.size == 1)
-        assert(session.state == UsageSession.State.Accessing)
+        assert(session.state is UsageSession.Accessing)
         assert(sessions.iterator().next().value == session)
         assert(latch.count == 1L)
 

@@ -43,7 +43,7 @@ class PolicyDecisionPoint {
 
             // catch exception for invalid state and return negative response 'already in use'
             val session = try {
-                SessionPip.getLockedSession(sessionId, UsageSession.State.Initial)
+                SessionPip.getLockedInitialSession(sessionId)
             } catch (e: InUseException) {
                 if (LOG.isDebugEnabled) {
                     LOG.debug("Session with id=$sessionId is already in use")
@@ -52,8 +52,8 @@ class PolicyDecisionPoint {
             }
 
             // feed tryAccess
-            session.feedEvent(UsageSession.Event.TryAccess)
-            assert(session.state == UsageSession.State.Requesting)
+            session.feedEvent(UsageSession.TryAccess)
+            assert(session.state is UsageSession.Requesting)
 
             // get policy from PMP
             val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
@@ -78,20 +78,16 @@ class PolicyDecisionPoint {
                         LOG.debug("Positive policy evaluation result - Permit the usage")
                     }
 
-                    // on success, permit access and bind policy to session
-                    session.feedEvent(UsageSession.Event.PermitAccess)
-                    assert(session.state == UsageSession.State.Accessing)
-                    session.bindToPolicy(policy)
-                    session.bindToListener(request.listener)
+                    // on success, permit access and bind policy. listener and timer to session
+                    var timer : ReevaluationTimer? = null
+                    if (policy.ongoingPeriod != null) {
+                        timer = ReevaluationTimer(policy.ongoingPeriod, policy.ongoingPeriod, sessionId)
+                        timer.schedule()
+                    }
+                    session.feedEvent(UsageSession.PermitAccess(policy, request.listener, timer))
+                    assert(session.state is UsageSession.Accessing)
 
                     // TODO UR2
-
-                    // start reevaluation timer (if configured) for ongoing usage decisions
-                    if (policy.ongoingPeriod != null) {
-                        val timer = ReevaluationTimer(policy.ongoingPeriod, policy.ongoingPeriod, sessionId)
-                        timer.schedule()
-                        session.reevaluationTimer = timer
-                    }
 
                     // unlock session for further usage
                     SessionPip.finishLock(session)
@@ -113,8 +109,8 @@ class PolicyDecisionPoint {
                     }
 
                     // on failure, deny access and delete usage session
-                    session.feedEvent(UsageSession.Event.DenyAccess)
-                    assert(session.state == UsageSession.State.Denied)
+                    session.feedEvent(UsageSession.DenyAccess)
+                    assert(session.state is UsageSession.Denied)
                     SessionPip.finishLock(session)
 
                     // return negative decision
@@ -134,9 +130,10 @@ class PolicyDecisionPoint {
             }
 
             // get session and assert state = accessing
-            val session = SessionPip.getLockedSession(sessionId, UsageSession.State.Accessing)
-            assert(session.state == UsageSession.State.Accessing)
-            val policy = session.policy ?: throw LuceException("Missing policy for ongoing session=$sessionId")
+            val session = SessionPip.getLockedContinuousSession(sessionId)
+            assert(session.state is UsageSession.Accessing)
+            val policy = (session.state as UsageSession.Accessing).policy
+            val listener = (session.state as UsageSession.Accessing).listener
 
             // re-evaluate policy
             if (LOG.isTraceEnabled) {
@@ -157,7 +154,7 @@ class PolicyDecisionPoint {
                     }
 
                     // unlock session for further usage
-                    assert(session.state == UsageSession.State.Accessing)
+                    assert(session.state is UsageSession.Accessing)
                     SessionPip.finishLock(session)
                 }
                 else -> {
@@ -174,8 +171,8 @@ class PolicyDecisionPoint {
                     }
 
                     // revoke the usage on failure
-                    session.feedEvent(UsageSession.Event.RevokeAccess)
-                    assert(session.state == UsageSession.State.Revoked)
+                    session.feedEvent(UsageSession.RevokeAccess)
+                    assert(session.state is UsageSession.Revoked)
                     val revokeSolution = PolicyEvaluator.evaluate(
                         policy.postAccessRevoked,
                         SolveOptions.DEFAULT
@@ -184,8 +181,6 @@ class PolicyDecisionPoint {
                     if (LOG.isDebugEnabled){
                         LOG.debug("Revocation resulted in solution=$revokeSolution")
                     }
-
-                    val listener = session.listener!!
 
                     // delete session
                     SessionPip.finishLock(session)
@@ -216,9 +211,9 @@ class PolicyDecisionPoint {
                 request.luceObject.identity.toString() + request.luceSubject.identity.toString() + request.luceRight.id
 
             // get session and assert state = accessing
-            val session = SessionPip.getLockedSession(sessionId, UsageSession.State.Accessing)
-            assert(session.state == UsageSession.State.Accessing)
-            val policy = session.policy ?: throw LuceException("Missing policy for finishing usage session=$sessionId")
+            val session = SessionPip.getLockedContinuousSession(sessionId)
+            assert(session.state is UsageSession.Accessing)
+            val policy = (session.state as UsageSession.Accessing).policy
 
             // re-evaluate policy
             if (LOG.isTraceEnabled) {
@@ -227,8 +222,8 @@ class PolicyDecisionPoint {
             }
 
             // revoke the usage on failure
-            session.feedEvent(UsageSession.Event.EndAccess)
-            assert(session.state == UsageSession.State.End)
+            session.feedEvent(UsageSession.EndAccess)
+            assert(session.state is UsageSession.End)
             val endSolution = PolicyEvaluator.evaluate(
                 policy.postAccessEnded,
                 SolveOptions.DEFAULT

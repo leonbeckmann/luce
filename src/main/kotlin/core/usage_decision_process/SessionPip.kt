@@ -16,49 +16,66 @@ object SessionPip {
     private val sessions = ConcurrentHashMap<String, UsageSession>()
 
     /**
-     * Called by the PDP, returns a (locked) usage session in the expected state
+     * Called by the PDP, returns a (locked) initial usage session
      */
-    fun getLockedSession(id: String, expectedState: UsageSession.State): UsageSession {
+    fun getLockedInitialSession(id: String) : UsageSession {
 
         if (LOG.isTraceEnabled) {
-            LOG.trace("Query usage session with id=$id")
+            LOG.trace("Query initial usage session with id=$id")
         }
 
-        // first check if the usage session already exists, otherwise create a new one
-        val session = when(expectedState) {
-            UsageSession.State.Initial -> {
-                // expect initial session, which might already exist but must be reset
-                sessions.getOrPut(id) {
-                    if (LOG.isTraceEnabled) {
-                        LOG.trace("Put new usage session with id=$id")
-                    }
-                    UsageSession(id)
-                }
+        // expect initial session, which might already exist but must be reset
+        val session = sessions.getOrPut(id) {
+            if (LOG.isTraceEnabled) {
+                LOG.trace("Put new usage session with id=$id")
             }
-            else -> {
-                // expect existent session
-                sessions[id] ?: throw LuceException("Expected session with id=$id does not exist")
-            }
+            UsageSession(id)
         }
 
         // lock session to get synchronized access
         session.lock()
 
         // check expected state
-        if (session.state != expectedState) {
+        if (session.state !is UsageSession.Initial) {
             val state = session.state
             session.unlock()
 
             // check if session is used for other access
-            if (session.state == UsageSession.State.Accessing) {
+            if (session.state is UsageSession.Accessing) {
                 throw InUseException("Session with id=$id is currently used")
             }
 
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
-                    "state=$expectedState")
+                    "state=${UsageSession.Initial}")
         }
 
-        // return locked session
+        return session
+    }
+
+    /**
+     * Called by the PDP, returns a (locked) continuous usage session
+     */
+    fun getLockedContinuousSession(id: String) : UsageSession {
+
+        if (LOG.isTraceEnabled) {
+            LOG.trace("Query continuous usage session with id=$id")
+        }
+
+        // expect existent session
+        val session = sessions[id] ?: throw LuceException("Expected session with id=$id does not exist")
+
+        // lock session to get synchronized access
+        session.lock()
+
+        // check expected state
+        if (session.state !is UsageSession.Accessing) {
+            val state = session.state
+            session.unlock()
+
+            throw LuceException("Session with id=$id in state=${state} is not in expected " +
+                    "state=${UsageSession.Accessing}")
+        }
+
         return session
     }
 
@@ -73,7 +90,7 @@ object SessionPip {
         if (!session.lock.isHeldByCurrentThread)
             throw LuceException("Session with id=${session.id} not held by current thread")
 
-        if (session.state == UsageSession.State.Accessing) {
+        if (session.state is UsageSession.Accessing) {
             // simply unlock session for further usage
             session.unlock()
             return
