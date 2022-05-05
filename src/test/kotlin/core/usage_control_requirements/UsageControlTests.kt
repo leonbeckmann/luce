@@ -3,11 +3,13 @@ package core.usage_control_requirements
 import core.control_flow_model.components.ComponentRegistry
 import core.control_flow_model.components.PolicyInformationPoint
 import core.logic.PolicyEvaluator
+import core.notification.MonitorClient
 import it.unibo.tuprolog.dsl.prolog
 import it.unibo.tuprolog.solve.SolveOptions
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
-import java.time.OffsetDateTime
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.Semaphore
 
 /**
@@ -26,14 +28,17 @@ internal class UsageControlTests {
             attributes["subject1.identity"] = "subject1"
             attributes["subject1.organizations"] = listOf("org1", "org2")
             attributes["subject1.devices"] = listOf("device1", "device2")
+            attributes["object1.identity"] = "object1"
             attributes["object1.authorized"] = listOf("subject1", "subject2", "subject3", "org2", "org3")
             attributes["object1.validDevices"] = listOf("device1")
             attributes["object1.semaphore"] = Semaphore(1)
             attributes["object1.revoked"] = false
             attributes["object1.counter"] = 5
-            attributes["object1.durationIntervalStart"] = OffsetDateTime.now().toEpochSecond()
-            attributes["object1.durationIntervalEnd"] = OffsetDateTime.now().toEpochSecond() + 100
-
+            attributes["object1.durationIntervalStart"] = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
+            attributes["object1.durationIntervalEnd"] = LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC) + 100
+            attributes["object1.dayTimeStart"] = "09:00:00"
+            attributes["object1.dayTimeEnd"] = "17:00:00"
+            attributes["object1.days"] = listOf("Monday", "Tuesday", "Wednesday")
         }
 
         override fun queryInformation(identifier: Any): Any? {
@@ -90,7 +95,7 @@ internal class UsageControlTests {
 
     class TimePip : PolicyInformationPoint {
         override fun queryInformation(identifier: Any): Long {
-            return OffsetDateTime.now().toEpochSecond()
+            return LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
 
         override fun updateInformationByValue(identifier: Any, newValue: Any?): Boolean = false
@@ -99,14 +104,45 @@ internal class UsageControlTests {
 
     }
 
+    class TimePip2 : PolicyInformationPoint {
+        override fun queryInformation(identifier: Any): Long {
+            // mod 60 == 0
+            return 1651508520
+        }
+
+        override fun updateInformationByValue(identifier: Any, newValue: Any?): Boolean = false
+
+        override fun updateInformation(identifier: Any, description: String): Boolean = false
+
+    }
+
+    class DefaultNotification : MonitorClient {
+
+        override fun notify(notification: String): Boolean {
+            println("Notification from DefaultNotification monitor: $notification")
+            return true
+        }
+
+        companion object {
+            fun id(): String = "default_monitor"
+        }
+
+    }
+
     companion object {
 
         @BeforeAll
         @JvmStatic
-        fun registerPips() {
+        fun registerComponents() {
+
+            // PIPs
             ComponentRegistry.addPolicyInformationPoint("test_pip_attr", AttributePip())
             ComponentRegistry.addPolicyInformationPoint("test_pip_device", DevicePip())
             ComponentRegistry.addPolicyInformationPoint("test_pip_time", TimePip())
+            ComponentRegistry.addPolicyInformationPoint("test_pip_time2", TimePip2())
+
+            // Notification Monitor
+            MonitorClient.register(DefaultNotification.id(), DefaultNotification())
         }
 
     }
@@ -196,16 +232,7 @@ internal class UsageControlTests {
      * U3 - Restriction to Applications
      */
 
-    @Test
-    fun testApplicationRestriction() {
-        // check if targetApp or its class is allowed to use the object
-        // TODO resolve flow context from X
-        val solution = PolicyEvaluator.evaluate(
-            prolog { "not"(false) },
-            SolveOptions.DEFAULT
-        )
-        assert(solution.isYes)
-    }
+    // TODO test if targetApp or its class is valid by o.applications
 
     /**
      * U5 - Environmental Conditions
@@ -219,17 +246,28 @@ internal class UsageControlTests {
                 "resolve_int"("test_pip_attr:object1.durationIntervalStart", "X") and
                 "resolve_int"("test_pip_attr:object1.durationIntervalEnd", "Y") and
                 "now"("test_pip_time", "Z") and
-                "within_time_interval"("X", "Y", "Z")
+                "within_interval"("X", "Y", "Z")
             },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
     }
 
-    // TODO
-     // DayTime timestamps
-    // getDayTime()
-    // o.timeIntervalStart, o.timeIntervalEnd
+    @Test
+    fun testDayTime() {
+        // only mondays, tuesdays and wednesdays between 9am and 5pm UTC
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "now"("test_pip_time2", "A") and
+                "resolve_string"("test_pip_attr:object1.dayTimeStart", "B") and
+                "resolve_string"("test_pip_attr:object1.dayTimeEnd", "C") and
+                "resolve_string_list"("test_pip_attr:object1.days", "D") and
+                "in_day_interval"("A", "B", "C", "D")
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
 
     // TODO location-based access
 
@@ -252,39 +290,74 @@ internal class UsageControlTests {
     /**
      * U8 - Occurrence of Events
      */
-    // TODO
+    // TODO payment
     // pay_provider(s.credits, o.one_time_fee)
     // when first of month then pay_provider_monthly(s.credits, o.monthly_fee)
 
-    // Notification(s,o,r)
-    // notify_monitor(subject, notification) : Boolean
+    @Test
+    fun testNotification() {
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "notify_monitor"("test-notification", DefaultNotification.id())
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
 
     /**
      * U9 - Purpose of Usage
      */
-    // TODO
-    // wait until requested usage has been allowed
-    // reactive enforcement by usage notifications
+    // TODO 'wait until requested usage has been allowed'
+
+    @Test
+    fun testPurposeNotification() {
+        // reactive enforcement by usage notifications
+        val right = "right_read_record_critical"
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "now"("test_pip_time", "A") and
+                "resolve_string"("test_pip_attr:subject1.identity", "B") and
+                "resolve_string"("test_pip_attr:object1.identity", "C") and
+                "usage_notification"("A", "B", "C", right, "D") and
+                "notify_monitor"("D", DefaultNotification.id())
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
 
     /**
      * U10 - Cardinality Limitation
      */
 
-    // TODO if now() mod 60 == 0 then update
     @Test
     fun testDecrementCounter() {
         // decrement counter to zero
         val attributes = (ComponentRegistry.policyInformationPoints["test_pip_attr"]!! as AttributePip).attributes
         val counter = attributes["object1.counter"] as Int
 
-        val solution = PolicyEvaluator.evaluate(
+        // ensure counter is decremented since fake now() is 0 modulo 60 (once a minute)
+        var solution = PolicyEvaluator.evaluate(
             prolog {
-                "decrement"("test_pip_attr:object1.counter")
+                ("now"("test_pip_time2", "X") and "not"("mod_is_zero"("X", 60))) or
+                        "decrement"("test_pip_attr:object1.counter")
             },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
         assert((attributes["object1.counter"] as Int) == counter - 1)
+
+        // ensure counter is not decremented when fake now() is not zero modulo 60
+        solution = PolicyEvaluator.evaluate(
+            prolog {
+                ("now"("test_pip_time2", "X") and "not"("mod_is_zero"(1651508521, 60))) or
+                        "decrement"("test_pip_attr:object1.counter")
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+        assert((attributes["object1.counter"] as Int) == counter - 1) // still counter - 1
     }
 
     @Test
@@ -302,9 +375,10 @@ internal class UsageControlTests {
     /**
      * U11 - Modification of Data
      */
+    // TODO
 
     /**
      * U12 - Deletion after Usage
      */
-
+    // TODO
 }

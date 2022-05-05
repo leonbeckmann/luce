@@ -3,6 +3,7 @@ package core.logic
 import core.control_flow_model.components.ComponentRegistry
 import core.control_flow_model.components.PolicyInformationPoint
 import core.exceptions.LuceException
+import core.notification.MonitorClient
 import it.unibo.tuprolog.core.*
 import it.unibo.tuprolog.core.List as PrologList
 import it.unibo.tuprolog.core.operators.OperatorSet
@@ -16,6 +17,11 @@ import it.unibo.tuprolog.solve.primitive.*
 import it.unibo.tuprolog.theory.Theory
 import it.unibo.tuprolog.theory.parsing.ClausesParser
 import it.unibo.tuprolog.unify.Unificator.Companion.mguWith
+import java.time.DayOfWeek
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * Default 2Prolog Library, implements basic PROLOG functionalities used by the PolicyEvaluator
@@ -37,17 +43,20 @@ class DefaultLibrary : AliasedLibrary {
         ResolveTruth.descriptionPair,
         ResolveString.descriptionPair,
         ResolveStringList.descriptionPair,
-        PipIdentifier.descriptionPair,
         Decrement.descriptionPair,
         Increment.descriptionPair,
         Now.descriptionPair,
+        ZeroModulo.descriptionPair,
+        InDayInterval.descriptionPair,
+        NotifyMonitor.descriptionPair,
+        UsageNotification.descriptionPair
     )
 
     override val theory: Theory = ClausesParser.withDefaultOperators.parseTheory(
                     """
                         list_empty([]).
-                        
-                        within_time_interval(X, Y, Z) :- X =< Z, Z < Y.
+                       
+                        within_interval(X, Y, Z) :- X =< Z, Z < Y.
                         
                     """.trimIndent())
 
@@ -92,7 +101,7 @@ class DefaultLibrary : AliasedLibrary {
             return PrologList.of(out)
         }
     }
-
+/*
     /**
      * pip_identifier/3
      *
@@ -121,7 +130,7 @@ class DefaultLibrary : AliasedLibrary {
         }
 
     }
-
+*/
     /**
      * intersection/3
      *
@@ -368,4 +377,160 @@ class DefaultLibrary : AliasedLibrary {
         }
     }
 
+    /**
+     * mod_is_zero/2
+     *
+     * Expected format: now(+Integer1, +Integer2)
+     * +Integer1: number
+     * +Integer2: modulo group
+     *
+     * A prolog predicate that verifies if Integer1 mod Integer2 is zero
+     *
+     * @return: true iff Integer1 mod Integer2 == 0
+     */
+    object ZeroModulo : BinaryRelation.Predicative<ExecutionContext>("mod_is_zero") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term): Boolean {
+            ensuringArgumentIsInteger(0)
+            ensuringArgumentIsInteger(1)
+            return (first.castToInteger().value.toLong() % second.castToInteger().value.toLong()) == 0L
+        }
+    }
+
+    /**
+     * in_day_interval/4
+     *
+     * Expected format: now(+Integer1, +Atom1, +Atom2, +List1)
+     * +Integer1: current time as UTC seconds since epoch
+     * +Atom1: start of daytime interval, in format HH:mm:ss
+     * +Atom2: end of daytime interval, in format HH:mm:ss
+     * +List1: Atom list of valid days ("Monday", ..., "Sunday")
+     *
+     * A prolog predicate that verifiers if current time lies within the daytime interval [Atom1, Atom2] and if
+     * the day is valid
+     *
+     * @return: true iff day is valid and daytime interval is satisfied
+     */
+    object InDayInterval : QuaternaryRelation.Predicative<ExecutionContext>("in_day_interval") {
+        override fun Solve.Request<ExecutionContext>.compute(
+            first: Term,
+            second: Term,
+            third: Term,
+            fourth: Term
+        ): Boolean {
+            ensuringArgumentIsInteger(0) // time
+            ensuringArgumentIsAtom(1) // startTime in HH:mm:ss
+            ensuringArgumentIsAtom(2) // endTime in HH:mm:ss
+            ensuringArgumentIsList(3) // days
+
+            // parse time from seconds since epoch (UTC)
+            val time = LocalDateTime.ofEpochSecond(first.castToInteger().value.toLong(), 0, ZoneOffset.UTC)
+
+            // parse start and end daytime
+            val currentTime = time.toLocalTime()
+            val currentDay = time.dayOfWeek
+            val startTime = LocalTime.parse(second.castToAtom().value, DateTimeFormatter.ISO_LOCAL_TIME)
+            val endTime = LocalTime.parse(third.castToAtom().value, DateTimeFormatter.ISO_LOCAL_TIME)
+
+            // parse days
+            val days = mutableListOf<DayOfWeek>()
+            fourth.castToList().toList().forEach {
+                if (!it.isAtom) {
+                    throw SystemError.forUncaughtException(
+                        context,
+                        LuceException("Weekday is expected to be an Atom")
+                    )
+                }
+                val d = when (val x = it.castToAtom().value) {
+                    "Monday" -> DayOfWeek.MONDAY
+                    "Tuesday" -> DayOfWeek.TUESDAY
+                    "Wednesday" -> DayOfWeek.WEDNESDAY
+                    "Thursday" -> DayOfWeek.THURSDAY
+                    "Friday" -> DayOfWeek.FRIDAY
+                    "Saturday" -> DayOfWeek.SATURDAY
+                    "Sunday" -> DayOfWeek.SUNDAY
+                    else -> {
+                        throw SystemError.forUncaughtException(
+                            context,
+                            LuceException("Unknown weekday '$x'")
+                        )
+                    }
+                }
+                days.add(d)
+            }
+
+            if (!days.contains(currentDay)) {
+                println("Invalid weekday")
+                return false
+            }
+
+            // verify if current time is between start and end time
+            return startTime.isBefore(currentTime) && endTime.isAfter(currentTime)
+        }
+    }
+
+    /**
+     * notify_monitor/1
+     *
+     * Expected format: now(+Atom1, +Atom2)
+     * +Atom1: Notification
+     * +Atom2: Monitor Identifier
+     *
+     * A prolog predicate that sends a notification to the monitor for subsequent audits
+     *
+     * @return: true iff notification was sent successfully
+     */
+    object NotifyMonitor : BinaryRelation.Predicative<ExecutionContext>("notify_monitor") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term): Boolean {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsAtom(1)
+
+            val monitorId = second.castToAtom().value
+            val monitor = MonitorClient.registry[monitorId]
+                ?: throw SystemError.forUncaughtException(
+                    context, LuceException("Missing notification monitor '$monitorId'")
+                )
+
+            return monitor.notify(first.castToAtom().value)
+        }
+    }
+
+    /**
+     * usage_notification/5
+     *
+     * Expected format: now(+Integer1, +Atom1, +Atom2, +Atom3, ?Common)
+     *
+     * A prolog predicate that creates a usage notification out of DateTime, Subject, Object and Right
+     *
+     * @return: MGU of notification
+     */
+    object UsageNotification : QuinaryRelation.Functional<ExecutionContext>("usage_notification") {
+        override fun Solve.Request<ExecutionContext>.computeOneSubstitution(
+            first: Term,
+            second: Term,
+            third: Term,
+            fourth: Term,
+            fifth: Term
+        ): Substitution {
+            ensuringArgumentIsInteger(0)
+            ensuringArgumentIsAtom(1)
+            ensuringArgumentIsAtom(2)
+            ensuringArgumentIsAtom(3)
+            ensuringArgumentIsVariable(4)
+
+            val dateTime = LocalDateTime.ofEpochSecond(
+                first.castToInteger().value.toLong(),
+                0,
+                ZoneOffset.UTC
+            )
+
+            val subject = second.castToAtom().value
+            val obj = third.castToAtom().value
+            val right = fourth.castToAtom().value
+
+            val notification = "$dateTime: Usage of object=$obj from subject=$subject with right=$right."
+
+            return Atom.of(notification).mguWith(fifth)
+        }
+
+    }
 }

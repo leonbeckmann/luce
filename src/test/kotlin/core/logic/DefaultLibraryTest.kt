@@ -138,12 +138,12 @@ internal class DefaultLibraryTest {
         assert(solution.isYes)
     }
 
-    @Test
+    /*@Test
     fun testPipIdentifier() {
         val solution = PolicyEvaluator.evaluate(
             prolog { "pip_identifier"("a", "b", "a:b") },
             SolveOptions.DEFAULT
         )
         assert(solution.isYes)
-    }
+    }*/
 }
