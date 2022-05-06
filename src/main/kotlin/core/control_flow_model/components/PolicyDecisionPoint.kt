@@ -187,7 +187,7 @@ class PolicyDecisionPoint {
 
                     // notify listener
                     // TODO logic
-                   listener.onRevocation(RevocationResponse())
+                    listener.onRevocation(RevocationResponse())
                 }
             }
         }

@@ -1,6 +1,8 @@
 package core.policies
 
+import it.unibo.tuprolog.core.Atom
 import it.unibo.tuprolog.core.Struct
+import it.unibo.tuprolog.core.Term
 
 /**
  * Low-level LUCE policy
@@ -17,12 +19,53 @@ class LucePolicy(
 ) {
 
     /**
-     * A function to merge together two low-level policies according to "Policy Combining" in 6.3.3
+     * A function to merge together two low-level policies according to "Deny-overrides" from "Policy Combining" in 6.3.3
      *
      * @return A fresh policy, combining this and the given policy
      */
-    fun merge(policy: LucePolicy) : LucePolicy {
+    fun mergeByConjunction(policy: LucePolicy) : LucePolicy {
         TODO("Not yet implemented")
+    }
+
+    /**
+     * Returns a fresh policy for which $OBJECT, $SUBJECT and $RIGHT are replaced by their specific identities
+     */
+    fun replaceVariables(
+        sId: String,
+        oId: String,
+        rId: String
+    ) : LucePolicy {
+        return LucePolicy(
+            replaceVarsInTerm(this.preAccess, sId, oId, rId).castToStruct(),
+            replaceVarsInTerm(this.postPermit, sId, oId, rId).castToStruct(),
+            replaceVarsInTerm(this.ongoingAccess, sId, oId, rId).castToStruct(),
+            this.ongoingPeriod,
+            replaceVarsInTerm(this.postAccessRevoked, sId, oId, rId).castToStruct(),
+            replaceVarsInTerm(this.postAccessEnded, sId, oId, rId).castToStruct(),
+        )
+    }
+
+    companion object {
+        private fun replaceVarsInTerm(
+            t: Term,
+            sId: String,
+            oId: String,
+            rId: String
+        ) : Term {
+            return when (t) {
+                is Atom -> {
+                    val value = t.value
+                        .replace("\$SUBJECT", sId)
+                        .replace("\$OBJECT", oId)
+                        .replace("\$RIGHT", rId)
+                    Atom.of(value)
+                }
+                is Struct -> {
+                    Struct.of(t.functor, t.args.map { replaceVarsInTerm(it, sId, oId, rId) })
+                }
+                else -> t
+            }
+        }
     }
 
 }
