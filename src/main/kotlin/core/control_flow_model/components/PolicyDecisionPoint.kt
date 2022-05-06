@@ -55,9 +55,15 @@ class PolicyDecisionPoint {
             session.feedEvent(UsageSession.Event.TryAccess)
             assert(session.state is UsageSession.State.Requesting)
 
-            // get policy from PMP
-            val policy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
+            // get policy from PMP and replace generic $OBJECT, $SUBJECT and $RIGHT by specific values
+            val genericPolicy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
                 throw LuceException("Policy is missing")
+
+            val policy = genericPolicy.replaceVariables(
+                request.luceSubject.identity.toString(),
+                request.luceObject.identity.toString(),
+                request.luceRight.id
+            )
 
             if (LOG.isTraceEnabled) {
                 LOG.trace("Retrieved policy=$policy from PMP")

@@ -44,7 +44,7 @@ internal class LucePolicyTest {
 
         assert(replacedPolicy.ongoingAccess.toString().contains("test_pip_attr:s1.identity"))
         assert(replacedPolicy.ongoingAccess.toString().contains("test_pip_attr:o1.identity"))
-        assert(replacedPolicy.ongoingAccess.toString().contains("A_0, B_0, C_0, r1, D_0"))
+        assert(replacedPolicy.ongoingAccess.toString().contains("r1, D"))
         assert(!replacedPolicy.ongoingAccess.toString().contains("\$SUBJECT"))
         assert(!replacedPolicy.ongoingAccess.toString().contains("\$OBJECT"))
         assert(!replacedPolicy.ongoingAccess.toString().contains("\$RIGHT"))
