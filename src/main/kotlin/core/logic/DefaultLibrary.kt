@@ -58,6 +58,23 @@ class DefaultLibrary : AliasedLibrary {
                        
                         within_interval(X, Y, Z) :- X =< Z, Z < Y.
                         
+                        non_empty_intersection(X, Y) :-
+                            intersection(X, Y, Z),
+                            not(list_empty(Z)).        
+                            
+                        time_restriction(X, Y, T) :-
+                            now(T, Z),
+                            within_interval(X, Y, Z).
+                            
+                        day_time_restriction(X, Y, T, D) :-
+                            now(T, Z),
+                            in_day_interval(Z, X, Y, D).
+                            
+                        purpose_notification(T, S, O, R, M) :-
+                            now(T, X),
+                            usage_notification(X, S, O, R, N),
+                            notify_monitor(N, M).
+                            
                     """.trimIndent())
 
     companion object {

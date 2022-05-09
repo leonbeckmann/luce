@@ -1,0 +1,117 @@
+{
+  "policy" : {
+    "id" : "policy1",
+    "issuer" : "issuerIdentity",
+    "contexts" : [
+      {
+        "type" : "objectId",
+        "value" : "object1"
+      }
+    ],
+    "rights" : [
+      "RIGHT_ID_READ",
+      "RIGHT_ID_WRITE",
+      "RIGHT_ID_APPEND"
+    ],
+    "preAccess" : {
+      "predicates" : [
+        {
+          "type" : "custom",
+          "identifier" : "member",
+          "args" : [
+            {
+              "type" : "resolveString",
+              "pip" : "test_pip_attr",
+              "attr" : "$SUBJECT.identity"
+            },
+            {
+              "type" : "resolveStringList",
+              "pip" : "test_pip_attr",
+              "attr" : "$OBJECT.authorized"
+            }
+          ]
+        },
+        {
+          "type" : "custom",
+          "identifier" : "decrement",
+          "args" : [
+            {
+              "type" : "resolveSemaphore",
+              "pip" : "test_pip_attr",
+              "attr" : "$OBJECT.semaphore"
+            }
+          ]
+        },
+        {
+          "type" : "usageNotification",
+          "monitor" : "monitor",
+          "timePip" : "pip_time1",
+          "subjectAttrPip" : "pip_attr1",
+          "objectAttrPip" : "pip_attr1"
+        }
+      ]
+    },
+    "ongoingAccess" : {
+      "triggers" : [
+        {
+          "type" : "period",
+          "period" : 60
+        }
+      ],
+      "predicates" : [
+        {
+          "type" : "usageNotification",
+          "monitor" : "monitor",
+          "timePip" : "pip_time1",
+          "subjectAttrPip" : "pip_attr1",
+          "objectAttrPip" : "pip_attr1"
+        },
+        {
+          "type" : "dayTime",
+          "timePip" : "pip_time1",
+          "startDayTime" : "07:00:00",
+          "endDayTime" : "18:00:00",
+          "timeZone" : "UTC",
+          "days" : [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday"
+          ]
+        }
+      ]
+    },
+    "postAccess" : {
+      "predicates" : [
+        {
+          "type" : "custom",
+          "identifier" : "increment",
+          "args" : [
+            {
+              "type" : "resolveSemaphore",
+              "pip" : "test_pip_attr",
+              "attr" : "$OBJECT.semaphore"
+            }
+          ]
+        }
+      ]
+    },
+    "postRevocation" : {
+      "predicates" : [
+        {
+          "type" : "custom",
+          "identifier" : "increment",
+          "args" : [
+            {
+              "type" : "resolveSemaphore",
+              "pip" : "test_pip_attr",
+              "attr" : "$OBJECT.semaphore"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "signature" : "policySignature"
+}

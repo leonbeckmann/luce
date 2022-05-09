@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "1.6.21"
+    kotlin("plugin.serialization") version "1.6.21"
     java
 }
 
@@ -16,6 +17,9 @@ dependencies {
     // Logging
     implementation("org.slf4j", "slf4j-api", "1.7.36")
     implementation("org.slf4j", "slf4j-simple", "1.7.36")
+
+    // LuceLang serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
 
     // TU PROLOG
     implementation("it.unibo.tuprolog", "core-jvm", "0.20.4")

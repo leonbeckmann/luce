@@ -172,8 +172,7 @@ internal class UsageControlTests {
             prolog {
                 "resolve_string_list"("test_pip_attr:subject1.organizations", "X") and
                 "resolve_string_list"("test_pip_attr:object1.authorized", "Y") and
-                "intersection"("X", "Y", "Z") and
-                "not"("list_empty"("Z"))
+                "non_empty_intersection"("X", "Y")
             },
             SolveOptions.DEFAULT
         )
@@ -194,7 +193,8 @@ internal class UsageControlTests {
                 "resolve_string"("test_pip_device:identity", "X") and
                 "resolve_string_list"("test_pip_attr:subject1.devices", "Y") and
                 "resolve_string_list"("test_pip_attr:object1.validDevices", "Z") and
-                "member"("X", "Y") and "member"("X", "Z")
+                "member"("X", "Y") and
+                "member"("X", "Z")
             },
             SolveOptions.DEFAULT
         )
@@ -245,8 +245,7 @@ internal class UsageControlTests {
             prolog {
                 "resolve_int"("test_pip_attr:object1.durationIntervalStart", "X") and
                 "resolve_int"("test_pip_attr:object1.durationIntervalEnd", "Y") and
-                "now"("test_pip_time", "Z") and
-                "within_interval"("X", "Y", "Z")
+                "time_restriction"("X", "Y","test_pip_time")
             },
             SolveOptions.DEFAULT
         )
@@ -258,11 +257,10 @@ internal class UsageControlTests {
         // only mondays, tuesdays and wednesdays between 9am and 5pm UTC
         val solution = PolicyEvaluator.evaluate(
             prolog {
-                "now"("test_pip_time2", "A") and
-                "resolve_string"("test_pip_attr:object1.dayTimeStart", "B") and
-                "resolve_string"("test_pip_attr:object1.dayTimeEnd", "C") and
+                "resolve_string"("test_pip_attr:object1.dayTimeStart", "X") and
+                "resolve_string"("test_pip_attr:object1.dayTimeEnd", "Y") and
                 "resolve_string_list"("test_pip_attr:object1.days", "D") and
-                "in_day_interval"("A", "B", "C", "D")
+                "day_time_restriction"("X", "Y", "test_pip_time2", "D")
             },
             SolveOptions.DEFAULT
         )
@@ -316,11 +314,9 @@ internal class UsageControlTests {
         val right = "right_read_record_critical"
         val solution = PolicyEvaluator.evaluate(
             prolog {
-                "now"("test_pip_time", "A") and
-                "resolve_string"("test_pip_attr:subject1.identity", "B") and
-                "resolve_string"("test_pip_attr:object1.identity", "C") and
-                "usage_notification"("A", "B", "C", right, "D") and
-                "notify_monitor"("D", DefaultNotification.id())
+                "resolve_string"("test_pip_attr:subject1.identity", "X") and
+                "resolve_string"("test_pip_attr:object1.identity", "Y") and
+                "purpose_notification"("test_pip_time", "X", "Y", right, DefaultNotification.id())
             },
             SolveOptions.DEFAULT
         )
