@@ -2,11 +2,14 @@ package policy_language
 
 import core.exceptions.LuceException
 import core.policies.LucePolicy
+import it.unibo.tuprolog.core.Atom
+import it.unibo.tuprolog.core.Struct
+import it.unibo.tuprolog.core.Truth
+import it.unibo.tuprolog.dsl.prolog
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import java.util.concurrent.Semaphore
 
 class LuceLang  {
 
@@ -61,12 +64,18 @@ class LuceLang  {
     @Serializable
     sealed class Predicate {
 
+        abstract fun translate() : Struct
+
         @Serializable
         @SerialName("notification")
         data class Notification(
             val monitor: String,
             val message: String,
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct = prolog {
+                "notify_monitor"(Atom.of(message), Atom.of(monitor))
+            }
+        }
 
         @Serializable
         @SerialName("usageNotification")
@@ -75,7 +84,13 @@ class LuceLang  {
             val timePip: String,
             val subjectAttrPip: String,
             val objectAttrPip: String
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct = prolog {
+                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), "X") and
+                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), "Y") and
+                "purpose_notification"(Atom.of(timePip), "X", "Y", Atom.of("\$RIGHT"), Atom.of(monitor))
+            }
+        }
 
         @Serializable
         @SerialName("timeInterval")
@@ -84,7 +99,11 @@ class LuceLang  {
             val startTime: String,
             val endTime: String,
             val timeZone: String
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct {
+                TODO("Not yet implemented")
+            }
+        }
 
         @Serializable
         @SerialName("duration")
@@ -93,7 +112,11 @@ class LuceLang  {
             val startTime: String,
             val duration: Long,
             val timeZone: String
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct {
+                TODO("Not yet implemented")
+            }
+        }
 
         @Serializable
         @SerialName("dayTime")
@@ -103,26 +126,47 @@ class LuceLang  {
             val endDayTime: String,
             val timeZone: String,
             val days: List<String>
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct {
+                TODO("Not yet implemented")
+            }
+        }
 
         @Serializable
         @SerialName("and")
-        data class And(val first: Predicate, val second: Predicate)
+        data class And(val first: Predicate, val second: Predicate) : Predicate() {
+            override fun translate(): Struct = prolog {
+                first.translate() and second.translate()
+            }
+        }
 
         @Serializable
         @SerialName("or")
-        data class Or(val first: Predicate, val second: Predicate)
+        data class Or(val first: Predicate, val second: Predicate) : Predicate() {
+            override fun translate(): Struct = prolog {
+                // TODO parentheses
+                first.translate() or second.translate()
+            }
+        }
 
         @Serializable
         @SerialName("not")
-        data class Not(val value: Predicate)
+        data class Not(val value: Predicate) : Predicate() {
+            override fun translate(): Struct = prolog {
+                "not"(value.translate())
+            }
+        }
 
         @Serializable
         @SerialName("custom")
         data class Custom(
             val identifier: String,
             val args: List<Argument>
-        ) : Predicate()
+        ) : Predicate() {
+            override fun translate(): Struct {
+                TODO("Not yet implemented")
+            }
+        }
 
         @Serializable
         sealed class Argument {
@@ -170,8 +214,47 @@ class LuceLang  {
             }
         }
 
+        private fun translationHelper(predicates: List<Predicate>) : Struct = prolog {
+            if (predicates.isEmpty()) {
+                // empty case
+                return@prolog Truth.TRUE
+            }
+
+            // not empty, translate predicates and concatenate via AND
+            val iterator = predicates.iterator()
+            var s : Struct = iterator.next().translate()
+
+            while (iterator.hasNext()) {
+                s = s and iterator.next().translate()
+            }
+
+            return@prolog s
+        }
+
         override fun translate(obj: PolicyWrapper): LucePolicy {
-            TODO()
+
+            val triggers = obj.policy.ongoingAccess.triggers
+            var period : Long? = null
+            if (triggers.size > 1) {
+                throw LuceException("Multiple ongoing triggers not yet supported")
+            } else if (triggers.size == 1) {
+                val trigger = triggers.first()
+                if (trigger is Trigger.PeriodicTrigger) {
+                    period = trigger.period
+                } else {
+                    throw LuceException("Trigger not yet supported")
+                }
+            }
+
+            return LucePolicy(
+                translationHelper(obj.policy.preAccess.predicates),
+                Truth.TRUE,
+                translationHelper(obj.policy.ongoingAccess.predicates),
+                period,
+                translationHelper(obj.policy.postRevocation.predicates),
+                translationHelper(obj.policy.postAccess.predicates),
+            )
+
         }
 
         override fun id(): String = "luce_lang_v1"
