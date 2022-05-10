@@ -17,7 +17,7 @@
       "predicates" : [
         {
           "type" : "custom",
-          "identifier" : "member",
+          "functor" : "member",
           "args" : [
             {
               "type" : "resolveString",
@@ -33,7 +33,7 @@
         },
         {
           "type" : "custom",
-          "identifier" : "decrement",
+          "functor" : "decrement",
           "args" : [
             {
               "type" : "resolveSemaphore",
@@ -71,7 +71,6 @@
           "timePip" : "pip_time1",
           "startDayTime" : "07:00:00",
           "endDayTime" : "18:00:00",
-          "timeZone" : "UTC",
           "days" : [
             "Monday",
             "Tuesday",
@@ -86,7 +85,7 @@
       "predicates" : [
         {
           "type" : "custom",
-          "identifier" : "increment",
+          "functor" : "increment",
           "args" : [
             {
               "type" : "resolveSemaphore",
@@ -101,7 +100,7 @@
       "predicates" : [
         {
           "type" : "custom",
-          "identifier" : "increment",
+          "functor" : "increment",
           "args" : [
             {
               "type" : "resolveSemaphore",

@@ -418,8 +418,8 @@ class DefaultLibrary : AliasedLibrary {
      *
      * Expected format: now(+Integer1, +Atom1, +Atom2, +List1)
      * +Integer1: current time as UTC seconds since epoch
-     * +Atom1: start of daytime interval, in format HH:mm:ss
-     * +Atom2: end of daytime interval, in format HH:mm:ss
+     * +Atom1: start of daytime interval, in format HH:mm:ss, UTC
+     * +Atom2: end of daytime interval, in format HH:mm:ss, UTC
      * +List1: Atom list of valid days ("Monday", ..., "Sunday")
      *
      * A prolog predicate that verifiers if current time lies within the daytime interval [Atom1, Atom2] and if

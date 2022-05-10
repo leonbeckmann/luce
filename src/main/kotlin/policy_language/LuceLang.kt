@@ -2,14 +2,17 @@ package policy_language
 
 import core.exceptions.LuceException
 import core.policies.LucePolicy
-import it.unibo.tuprolog.core.Atom
-import it.unibo.tuprolog.core.Struct
-import it.unibo.tuprolog.core.Truth
+import it.unibo.tuprolog.core.*
 import it.unibo.tuprolog.dsl.prolog
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import it.unibo.tuprolog.core.List as PrologList
 
 class LuceLang  {
 
@@ -86,22 +89,34 @@ class LuceLang  {
             val objectAttrPip: String
         ) : Predicate() {
             override fun translate(): Struct = prolog {
-                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), "X") and
-                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), "Y") and
-                "purpose_notification"(Atom.of(timePip), "X", "Y", Atom.of("\$RIGHT"), Atom.of(monitor))
+                val v1 = Var.of("X")
+                val v2 = Var.of("X")
+                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), v1) and
+                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), v2) and
+                "purpose_notification"(Atom.of(timePip), v1, v2, Atom.of("\$RIGHT"), Atom.of(monitor))
             }
         }
+
+        // TODO format
 
         @Serializable
         @SerialName("timeInterval")
         data class TimeIntervalRestriction(
             val timePip : String,
-            val startTime: String,
-            val endTime: String,
+            val startTime: String,  // ISO_LOCAL_DATE_TIME: yyyy-MM-ddTHH:mm:ss
+            val endTime: String,    // ISO_LOCAL_DATE_TIME
             val timeZone: String
         ) : Predicate() {
             override fun translate(): Struct {
-                TODO("Not yet implemented")
+                val startTime = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val endTime = LocalDateTime.parse(endTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val zone = ZoneId.of(timeZone)
+                val zonedStart = ZonedDateTime.of(startTime, zone)
+                val zonedEnd = ZonedDateTime.of(endTime, zone)
+
+                return prolog {
+                    "time_restriction"(zonedStart.toEpochSecond(), zonedEnd.toEpochSecond(), Atom.of(timePip))
+                }
             }
         }
 
@@ -109,12 +124,20 @@ class LuceLang  {
         @SerialName("duration")
         data class DurationRestriction(
             val timePip : String,
-            val startTime: String,
-            val duration: Long,
+            val startTime: String,  // ISO_LOCAL_DATE_TIME
+            val duration: Long,     // seconds
             val timeZone: String
         ) : Predicate() {
             override fun translate(): Struct {
-                TODO("Not yet implemented")
+                val startTime = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                val endTime = startTime.plusSeconds(duration)
+                val zone = ZoneId.of(timeZone)
+                val zonedStart = ZonedDateTime.of(startTime, zone)
+                val zonedEnd = ZonedDateTime.of(endTime, zone)
+
+                return prolog {
+                    "time_restriction"(zonedStart.toEpochSecond(), zonedEnd.toEpochSecond(), Atom.of(timePip))
+                }
             }
         }
 
@@ -122,13 +145,14 @@ class LuceLang  {
         @SerialName("dayTime")
         data class DayTimeRestriction(
             val timePip: String,
-            val startDayTime: String,
-            val endDayTime: String,
-            val timeZone: String,
+            val startDayTime: String,   // ISO_LOCAL_TIME in UTC
+            val endDayTime: String,     // ISO_LOCAL_TIME in UTC
             val days: List<String>
         ) : Predicate() {
-            override fun translate(): Struct {
-                TODO("Not yet implemented")
+            override fun translate(): Struct = prolog {
+                val atomicDays = mutableListOf<Atom>()
+                days.forEach { atomicDays.add(Atom.of(it)) }
+                "day_time_restriction"(Atom.of(startDayTime), Atom.of(endDayTime), Atom.of(timePip), PrologList.of(atomicDays))
             }
         }
 
@@ -136,7 +160,7 @@ class LuceLang  {
         @SerialName("and")
         data class And(val first: Predicate, val second: Predicate) : Predicate() {
             override fun translate(): Struct = prolog {
-                first.translate() and second.translate()
+                (first.translate() and second.translate())
             }
         }
 
@@ -144,8 +168,7 @@ class LuceLang  {
         @SerialName("or")
         data class Or(val first: Predicate, val second: Predicate) : Predicate() {
             override fun translate(): Struct = prolog {
-                // TODO parentheses
-                first.translate() or second.translate()
+                (first.translate() or second.translate())
             }
         }
 
@@ -160,48 +183,107 @@ class LuceLang  {
         @Serializable
         @SerialName("custom")
         data class Custom(
-            val identifier: String,
+            val functor: String,
             val args: List<Argument>
         ) : Predicate() {
-            override fun translate(): Struct {
-                TODO("Not yet implemented")
+            override fun translate(): Struct = prolog {
+                // each argument is translated to a term and a struct
+                // the struct is added to the overall struct via AND
+                // the term is used as an argument to the functor struct
+                var s : Struct = Truth.TRUE
+                val args = args.map { x ->
+                    val (struct, t) = x.translate()
+                    s = s and struct
+                    t
+                }
+                s and Struct.of(functor, args)
             }
         }
 
         @Serializable
         sealed class Argument {
 
+            /**
+             * A function that translates an argument to prolog
+             *
+             * @return: A pair of a struct and a term. The struct is combined with the custom struct by AND, the term
+             * corresponds to the argument of the custom struct
+             */
+            abstract fun translate() : Pair<Struct, Term>
+
             @Serializable
             @SerialName("resolveString")
-            data class ResolveString(val pip: String, val attr: String) : Argument()
+            data class ResolveString(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> = prolog {
+                    val v : Term = Var.of("X")
+                    val struct = "resolve_string"(Atom.of("$pip:$attr"), v)
+                    return@prolog Pair(struct, v)
+                }
+            }
 
             @Serializable
             @SerialName("resolveStringList")
-            data class ResolveStringList(val pip: String, val attr: String) : Argument()
+            data class ResolveStringList(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> = prolog {
+                    val v : Term = Var.of("X")
+                    val struct = "resolve_string_list"(Atom.of("$pip:$attr"), v)
+                    return@prolog Pair(struct, v)
+                }
+            }
 
             @Serializable
             @SerialName("resolveInt")
-            data class ResolveInt(val pip: String, val attr: String) : Argument()
+            data class ResolveInt(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> = prolog {
+                    val v : Term = Var.of("X")
+                    val struct = "resolve_int"(Atom.of("$pip:$attr"), v)
+                    return@prolog Pair(struct, v)
+                }
+            }
 
             @Serializable
             @SerialName("resolveReal")
-            data class ResolveReal(val pip: String, val attr: String) : Argument()
+            data class ResolveReal(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> = prolog {
+                    val v : Term = Var.of("X")
+                    val struct = "resolve_real"(Atom.of("$pip:$attr"), v)
+                    return@prolog Pair(struct, v)
+                }
+            }
 
             @Serializable
             @SerialName("resolveTruth")
-            data class ResolveTruth(val pip: String, val attr: String) : Argument()
+            data class ResolveTruth(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> = prolog {
+                    val v : Term = Var.of("X")
+                    val struct = "resolve_truth"(Atom.of("$pip:$attr"), v)
+                    return@prolog Pair(struct, v)
+                }
+            }
 
             @Serializable
             @SerialName("resolveSemaphore")
-            data class ResolveSemaphore(val pip: String, val attr: String) : Argument()
+            data class ResolveSemaphore(val pip: String, val attr: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> {
+                    return Pair(Truth.TRUE, Atom.of("$pip:$attr"))
+                }
+            }
 
             @Serializable
             @SerialName("lString")
-            data class LString(val value: String) : Argument()
+            data class LString(val value: String) : Argument() {
+                override fun translate(): Pair<Struct, Term> {
+                    return Pair(Truth.TRUE, Atom.of(value))
+                }
+            }
 
             @Serializable
             @SerialName("lInt")
-            data class LInt(val value: Int) : Argument()
+            data class LInt(val value: Int) : Argument() {
+                override fun translate(): Pair<Struct, Term> {
+                    return Pair(Truth.TRUE, Integer.of(value))
+                }
+            }
         }
     }
 
