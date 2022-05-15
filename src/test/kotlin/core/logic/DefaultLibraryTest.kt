@@ -16,8 +16,7 @@ internal class DefaultLibraryTest {
             return 3
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
-        override fun updateInformation(identifier: Any, description: String): Boolean = true
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = true
     }
 
     class RealPip : PolicyInformationPoint {
@@ -25,8 +24,7 @@ internal class DefaultLibraryTest {
             return 1.5
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
-        override fun updateInformation(identifier: Any, description: String): Boolean = true
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = true
     }
 
     class TruthPip : PolicyInformationPoint {
@@ -34,8 +32,7 @@ internal class DefaultLibraryTest {
             return true
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
-        override fun updateInformation(identifier: Any, description: String): Boolean = true
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = true
     }
 
     class StringPip : PolicyInformationPoint {
@@ -43,8 +40,7 @@ internal class DefaultLibraryTest {
             return "a"
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
-        override fun updateInformation(identifier: Any, description: String): Boolean = true
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = true
     }
 
     class StringListPip : PolicyInformationPoint {
@@ -52,8 +48,7 @@ internal class DefaultLibraryTest {
             return listOf("a", "b", "c")
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = true
-        override fun updateInformation(identifier: Any, description: String): Boolean = true
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = true
     }
 
     companion object {

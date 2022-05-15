@@ -11,7 +11,6 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.test.util.ReflectionTestUtils
 import java.util.concurrent.ConcurrentHashMap
 
-
 internal class SessionPipTest {
 
     @Test

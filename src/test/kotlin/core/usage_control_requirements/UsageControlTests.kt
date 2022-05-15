@@ -6,6 +6,7 @@ import core.logic.PolicyEvaluator
 import core.notification.MonitorClient
 import it.unibo.tuprolog.dsl.prolog
 import it.unibo.tuprolog.solve.SolveOptions
+import it.unibo.tuprolog.core.Atom
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import java.time.LocalDateTime
@@ -39,15 +40,16 @@ internal class UsageControlTests {
             attributes["object1.dayTimeStart"] = "09:00:00"
             attributes["object1.dayTimeEnd"] = "17:00:00"
             attributes["object1.days"] = listOf("Monday", "Tuesday", "Wednesday")
+            attributes["subject1.assignedRoles"] = listOf("role2")
+            attributes["subject1.activeRoles"] = mutableListOf<String>()
+            attributes["object1.rolePermissions"] = listOf(Pair("role1", listOf("read")), Pair("role2", listOf("read", "write")))
         }
 
         override fun queryInformation(identifier: Any): Any? {
             return attributes[identifier]
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean = false
-
-        override fun updateInformation(identifier: Any, description: String): Boolean {
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean {
             val attr = attributes[identifier] ?: return false
 
             when (attr) {
@@ -79,7 +81,13 @@ internal class UsageControlTests {
                     }
                     else -> false
                 }
-                else -> return false
+                else -> {
+                    // catch individual cases
+                    if (identifier == "subject1.activeRoles" && description == "append" && value is String) {
+                        return (attr as MutableList<String>).add(value)
+                    }
+                    return false
+                }
             }
         }
     }
@@ -89,8 +97,7 @@ internal class UsageControlTests {
             return "device1"
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?) = false
-        override fun updateInformation(identifier: Any, description: String): Boolean = false
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
     }
 
     class TimePip : PolicyInformationPoint {
@@ -98,9 +105,7 @@ internal class UsageControlTests {
             return LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?): Boolean = false
-
-        override fun updateInformation(identifier: Any, description: String): Boolean = false
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
 
     }
 
@@ -110,9 +115,7 @@ internal class UsageControlTests {
             return 1651508520
         }
 
-        override fun updateInformationByValue(identifier: Any, newValue: Any?): Boolean = false
-
-        override fun updateInformation(identifier: Any, description: String): Boolean = false
+        override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
 
     }
 
@@ -179,7 +182,26 @@ internal class UsageControlTests {
         assert(solution.isYes)
     }
 
-    // TODO Role-based Access Control
+    @Test
+    fun testRbac() {
+        // user-role assignment in subject.assignedRoles
+        // role-permission assignment in object.permissionRoles
+        val right = "read"
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "resolve_string_list"("test_pip_attr:subject1.assignedRoles", "X") and
+                "resolve_string_list"("test_pip_attr:subject1.activeRoles", "Y") and
+                "resolve_role_permissions"("test_pip_attr:object1.rolePermissions", "Z") and
+                "member"("R", "X") and
+                "not"("member"("R", "Y")) and
+                "rpa"("R", Atom.of(right), "Z") and
+                "activate_role"("test_pip_attr:subject1.activeRoles", "R")
+            },
+            SolveOptions.DEFAULT
+        )
+        println(solution)
+        assert(solution.isYes)
+    }
 
     /**
      * U2 - Restriction to Devices
@@ -231,8 +253,7 @@ internal class UsageControlTests {
     /**
      * U3 - Restriction to Applications
      */
-
-    // TODO test if targetApp or its class is valid by o.applications
+    // TODO Future Work: check if target application is authorized
 
     /**
      * U5 - Environmental Conditions
@@ -267,7 +288,7 @@ internal class UsageControlTests {
         assert(solution.isYes)
     }
 
-    // TODO location-based access
+    // TODO Future Work: Location-based usage restrictions
 
     /**
      * U7 - Usage Access Revocation
@@ -288,9 +309,7 @@ internal class UsageControlTests {
     /**
      * U8 - Occurrence of Events
      */
-    // TODO payment
-    // pay_provider(s.credits, o.one_time_fee)
-    // when first of month then pay_provider_monthly(s.credits, o.monthly_fee)
+    // TODO Future Work: one-time and monthly payment
 
     @Test
     fun testNotification() {
@@ -306,7 +325,7 @@ internal class UsageControlTests {
     /**
      * U9 - Purpose of Usage
      */
-    // TODO 'wait until requested usage has been allowed'
+    // TODO Future Work: wait until requested usage has been explicitly allowed'
 
     @Test
     fun testPurposeNotification() {

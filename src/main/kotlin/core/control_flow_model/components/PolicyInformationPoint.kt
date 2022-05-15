@@ -8,7 +8,6 @@ package core.control_flow_model.components
 interface PolicyInformationPoint {
 
     fun queryInformation(identifier: Any) : Any?
-    fun updateInformationByValue(identifier: Any, newValue: Any?) : Boolean
-    fun updateInformation(identifier: Any, description: String) : Boolean
+    fun updateInformation(identifier: Any, description: String, value: Any?) : Boolean
 
 }

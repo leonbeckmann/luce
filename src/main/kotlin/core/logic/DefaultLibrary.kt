@@ -49,11 +49,14 @@ class DefaultLibrary : AliasedLibrary {
         ZeroModulo.descriptionPair,
         InDayInterval.descriptionPair,
         NotifyMonitor.descriptionPair,
-        UsageNotification.descriptionPair
+        UsageNotification.descriptionPair,
+        ActivateRole.descriptionPair,
+        ResolveRolePermissions.descriptionPair,
+        Rpa.descriptionPair
     )
 
     override val theory: Theory = ClausesParser.withDefaultOperators.parseTheory(
-                    """
+        """
                         list_empty([]).
                        
                         within_interval(X, Y, Z) :- X =< Z, Z < Y.
@@ -75,11 +78,12 @@ class DefaultLibrary : AliasedLibrary {
                             usage_notification(X, S, O, R, N),
                             notify_monitor(N, M).
                             
-                    """.trimIndent())
+                    """.trimIndent()
+    )
 
     companion object {
 
-        private fun getPip(id: String, context: ExecutionContext) : PolicyInformationPoint {
+        private fun getPip(id: String, context: ExecutionContext): PolicyInformationPoint {
             return ComponentRegistry.policyInformationPoints[id]
                 ?: throw SystemError.forUncaughtException(
                     context,
@@ -87,7 +91,7 @@ class DefaultLibrary : AliasedLibrary {
                 )
         }
 
-        private fun splitIdentifier(value: String, context: ExecutionContext) : Pair<String, String> {
+        private fun splitIdentifier(value: String, context: ExecutionContext): Pair<String, String> {
             val tokens = value.split(":")
             if (tokens.size != 2) {
                 throw SyntaxError.of(
@@ -98,13 +102,13 @@ class DefaultLibrary : AliasedLibrary {
             return Pair(tokens[0], tokens[1])
         }
 
-        private fun resolveHelper(value: String, context: ExecutionContext) : Any? {
+        private fun resolveHelper(value: String, context: ExecutionContext): Any? {
             val (pipId, attrId) = splitIdentifier(value, context)
             val pip = getPip(pipId, context)
             return pip.queryInformation(attrId)
         }
 
-        fun intersection(a: PrologList, b: PrologList) : PrologList {
+        fun intersection(a: PrologList, b: PrologList): PrologList {
             val set = mutableSetOf<Term>()
             a.toList().iterator().forEach {
                 set.add(it)
@@ -342,7 +346,7 @@ class DefaultLibrary : AliasedLibrary {
 
             val (pipId, attrId) = splitIdentifier(first.castToAtom().value, context)
             val pip = getPip(pipId, context)
-            return pip.updateInformation(attrId, "decrement")
+            return pip.updateInformation(attrId, "decrement", null)
         }
     }
 
@@ -362,7 +366,7 @@ class DefaultLibrary : AliasedLibrary {
 
             val (pipId, attrId) = splitIdentifier(first.castToAtom().value, context)
             val pip = getPip(pipId, context)
-            return pip.updateInformation(attrId, "increment")
+            return pip.updateInformation(attrId, "increment", null)
         }
     }
 
@@ -515,6 +519,11 @@ class DefaultLibrary : AliasedLibrary {
      * usage_notification/5
      *
      * Expected format: now(+Integer1, +Atom1, +Atom2, +Atom3, ?Common)
+     * +Integer1: seconds since epoch (UTC)
+     * +Atom1: subject identity
+     * +Atom2: object identity
+     * +Atom3: right id
+     * ?Common: Variable that stores notification
      *
      * A prolog predicate that creates a usage notification out of DateTime, Subject, Object and Right
      *
@@ -548,6 +557,124 @@ class DefaultLibrary : AliasedLibrary {
 
             return Atom.of(notification).mguWith(fifth)
         }
+    }
 
+    /**
+     * activate_role/3
+     *
+     * Expected format: activate_role(+Atom1, +Atom2)
+     * +Atom1: pip:attr
+     * +Atom2: role
+     *
+     * A prolog predicate that activates a user RBAC role
+     *
+     * @return: true iff role is activated
+     */
+    object ActivateRole : BinaryRelation.Predicative<ExecutionContext>("activate_role") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term): Boolean {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsAtom(1)
+
+            val (pipId, attrId) = splitIdentifier(first.castToAtom().value, context)
+            val pip = getPip(pipId, context)
+
+            return pip.updateInformation(attrId, "append", second.castToAtom().value)
+        }
+    }
+
+    /**
+     * resolve_role_permission/2
+     *
+     * Expected format: activate_role(+Atom1, ?Common)
+     * +Atom1: pip:attr
+     * ?Common: variable that stores list of role-permission assignments
+     *
+     * A prolog predicate that resolves role-permission assignments for specific object
+     *
+     * @return: MGU
+     */
+    object ResolveRolePermissions : BinaryRelation.Functional<ExecutionContext>("resolve_role_permissions") {
+        override fun Solve.Request<ExecutionContext>.computeOneSubstitution(
+            first: Term,
+            second: Term
+        ): Substitution {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsVariable(1)
+
+            return when (val attrVal = resolveHelper(first.castToAtom().value, context)) {
+                is List<*> -> {
+                    val inList = attrVal.filterIsInstance<Pair<String, List<String>>>().map { (a, b) ->
+                        Tuple.of(Atom.of(a), PrologList.of(b.map { x -> Atom.of(x) }))
+                    }
+                    PrologList.of(inList).mguWith(second)
+                }
+                else -> {
+                    throw SystemError.forUncaughtException(
+                        context,
+                        LuceException("Attribute is not a List of Role-Permission assignments")
+                    )
+                }
+            }
+        }
+    }
+
+
+    /**
+     * rpa/3
+     *
+     * Expected format: rpa(+Atom1, +Atom2, +List)
+     * +Atom1: role
+     * +Atom2: requested right
+     * +List: List that stores Role-Permission Assignment (partially ordered by >), Type: List<(Role: String, List<Right: String>)>
+     *
+     * A prolog predicate that checks whether there is a role role2 such that role >= role2 and (role2, right) in
+     * role-permission assignments
+     *
+     * @return: true iff such a role2 was found
+     */
+    object Rpa : TernaryRelation.Predicative<ExecutionContext>("rpa") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term, third: Term): Boolean {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsAtom(1)
+            ensuringArgumentIsList(2)
+
+            val role = first.castToAtom().value
+            val right = second.castToAtom().value
+            val rp = third.castToList().toList().filterIsInstance<Tuple>()
+            var result = false
+
+            // iterate over roles, which are partially ordered by index, i.e. role[i+1] > role[i]
+            // thus iterate until role and return true if any of the roles contains the right
+            rp.forEach {
+                if (it.left !is Atom || it.right !is PrologList) {
+                    throw SystemError.forUncaughtException(
+                        context,
+                        LuceException("Role-Permission Assignment invalid")
+                    )
+                }
+
+                val currentRole = it.left.castToAtom().value
+                if (result) {
+                    // there was already a role, for which the required right is assigned
+                    // we only have to ensure that 'role' is in 'rp'
+                    if (currentRole == role) {
+                        return true
+                    }
+                } else {
+                    // no role found yet, which assigns the required right, check assigned rights for this role
+                    if (it.right.castToList().toList().filterIsInstance<Atom>().contains(Atom.of(right))) {
+                        result = true
+                    }
+
+                    if (currentRole == role) {
+                        // requested role reached
+                        return result
+                    }
+                }
+
+            }
+            // when we reach this, then role was not available in the rp list
+            return false
+        }
     }
 }
