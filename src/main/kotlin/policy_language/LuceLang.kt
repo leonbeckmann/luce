@@ -53,6 +53,8 @@ class LuceLang  {
         @SerialName("period")
         data class PeriodicTrigger(val period: Long) : Trigger()
 
+        // TODO Future Work: AttributeChangeListener
+
     }
 
     @Serializable
@@ -177,6 +179,28 @@ class LuceLang  {
         data class Not(val value: Predicate) : Predicate() {
             override fun translate(): Struct = prolog {
                 "not"(value.translate())
+            }
+        }
+
+        @Serializable
+        @SerialName("rbac")
+        data class Rbac(
+            val subjectAttrPip: String,
+            val objectAttrPip: String,
+            val right: String
+        ) : Predicate() {
+            override fun translate(): Struct = prolog {
+                val assignedRoles = Var.of("X")
+                val activeRoles = Var.of("X")
+                val rolePermissionAssignment = Var.of("X")
+
+                "resolve_string_list"("$subjectAttrPip:\$SUBJECT.assignedRoles", assignedRoles) and
+                "resolve_string_list"("$subjectAttrPip:\$SUBJECT.activeRoles", activeRoles) and
+                "resolve_role_permissions"("$objectAttrPip:\$OBJECT.rolePermissions", rolePermissionAssignment) and
+                "member"("R", assignedRoles) and
+                "not"("member"("R", activeRoles)) and
+                "rpa"("R", Atom.of(right), rolePermissionAssignment) and
+                "activate_role"("$subjectAttrPip:\$SUBJECT.activeRoles", "R")
             }
         }
 
@@ -330,7 +354,7 @@ class LuceLang  {
 
             return LucePolicy(
                 translationHelper(obj.policy.preAccess.predicates),
-                Truth.TRUE,
+                Truth.TRUE, // TODO Post Permit
                 translationHelper(obj.policy.ongoingAccess.predicates),
                 period,
                 translationHelper(obj.policy.postRevocation.predicates),
