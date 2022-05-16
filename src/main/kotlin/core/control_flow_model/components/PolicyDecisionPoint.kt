@@ -55,74 +55,79 @@ class PolicyDecisionPoint {
             session.feedEvent(UsageSession.Event.TryAccess)
             assert(session.state is UsageSession.State.Requesting)
 
-            // get policy from PMP and replace generic $OBJECT, $SUBJECT and $RIGHT by specific values
-            val genericPolicy = ComponentRegistry.policyManagementPoint.pullPolicy() ?:
-                throw LuceException("Policy is missing")
+            // get generic policies from PMP (all that are applicable)
+            val genericPolicies = ComponentRegistry.policyManagementPoint.pullPolicy(request.luceObject, request.luceRight)
+            if (genericPolicies.isEmpty()) throw LuceException("Policy is missing")
 
-            val policy = genericPolicy.replaceVariables(
-                request.luceSubject.identity.toString(),
-                request.luceObject.identity.toString(),
-                request.luceRight.id
-            )
+            // iterate over policies until one is applicable
+            for (genericPolicy in genericPolicies.listIterator()) {
+                // replace generic $OBJECT, $SUBJECT and $RIGHT by specific values
 
-            if (LOG.isTraceEnabled) {
-                LOG.trace("Retrieved policy=$policy from PMP")
-                LOG.trace("Start pre-access policy evaluation")
-            }
+                val policy = genericPolicy.replaceVariables(
+                    request.luceSubject.identity.toString(),
+                    request.luceObject.identity.toString(),
+                    request.luceRight.id
+                )
 
-            // evaluate policy
-            val solution = PolicyEvaluator.evaluate(
-                policy.preAccess,
-                SolveOptions.DEFAULT
-            )
-
-            // respond according to result
-            when (solution) {
-                is Solution.Yes -> {
-
-                    if (LOG.isDebugEnabled) {
-                        LOG.debug("Positive policy evaluation result - Permit the usage")
-                    }
-
-                    // on success, permit access and bind policy. listener and timer to session
-                    var timer : ReevaluationTimer? = null
-                    if (policy.ongoingPeriod != null) {
-                        timer = ReevaluationTimer(policy.ongoingPeriod, policy.ongoingPeriod, sessionId)
-                        timer.schedule()
-                    }
-                    session.feedEvent(UsageSession.Event.PermitAccess(policy, request.listener, timer))
-                    assert(session.state is UsageSession.State.Accessing)
-
-                    // TODO UR2
-
-                    // unlock session for further usage
-                    SessionPip.finishLock(session)
-
-                    // return positive decision
-                    return DecisionResponse.PERMITTED
+                if (LOG.isTraceEnabled) {
+                    LOG.trace("Retrieved policy=$policy from PMP")
+                    LOG.trace("Start pre-access policy evaluation")
                 }
-                else -> {
-                    if (solution is Solution.Halt) {
-                        // failure with exception
+
+                // evaluate policy
+                val solution = PolicyEvaluator.evaluate(
+                    policy.preAccess,
+                    SolveOptions.DEFAULT
+                )
+
+                // respond according to result
+                when (solution) {
+                    is Solution.Yes -> {
+
                         if (LOG.isDebugEnabled) {
-                            LOG.debug("Policy evaluation failed with an exception=${solution.exception} - Deny the usage")
+                            LOG.debug("Positive policy evaluation result - Permit the usage")
                         }
-                    } else {
-                        // negative prolog decision
-                        if (LOG.isDebugEnabled) {
-                            LOG.debug("Negative policy evaluation result - Deny the usage")
+
+                        // on success, permit access and bind policy. listener and timer to session
+                        var timer : ReevaluationTimer? = null
+                        if (policy.ongoingPeriod != null) {
+                            timer = ReevaluationTimer(policy.ongoingPeriod, policy.ongoingPeriod, sessionId)
+                            timer.schedule()
+                        }
+                        session.feedEvent(UsageSession.Event.PermitAccess(policy, request.listener, timer))
+                        assert(session.state is UsageSession.State.Accessing)
+
+                        // TODO UR2
+
+                        // unlock session for further usage
+                        SessionPip.finishLock(session)
+
+                        // return positive decision
+                        return DecisionResponse.PERMITTED
+                    }
+                    else -> {
+                        if (solution is Solution.Halt) {
+                            // failure with exception
+                            if (LOG.isDebugEnabled) {
+                                LOG.debug("Policy evaluation failed with an exception=${solution.exception} - Deny the usage")
+                            }
+                        } else {
+                            // negative prolog decision
+                            if (LOG.isDebugEnabled) {
+                                LOG.debug("Negative policy evaluation result - Deny the usage")
+                            }
                         }
                     }
-
-                    // on failure, deny access and delete usage session
-                    session.feedEvent(UsageSession.Event.DenyAccess)
-                    assert(session.state is UsageSession.State.Denied)
-                    SessionPip.finishLock(session)
-
-                    // return negative decision
-                    return DecisionResponse.DENIED
                 }
             }
+
+            // when we reach here, all policy evaluations have failed, deny access and delete usage session
+            session.feedEvent(UsageSession.Event.DenyAccess)
+            assert(session.state is UsageSession.State.Denied)
+            SessionPip.finishLock(session)
+
+            // return negative decision
+            return DecisionResponse.DENIED
         }
 
         /**

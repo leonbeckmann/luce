@@ -5,6 +5,4 @@ package core.admin
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
-class LuceRight(
-    val id: String
-)
+data class LuceRight(val id: String)

@@ -12,10 +12,10 @@ abstract class LuceObject<Sid, Oid>(
     ownerRights: Set<LuceRight>
 ) {
 
-    val rights = mutableMapOf<Sid, MutableSet<LuceRight>>()
+    val rights = mutableMapOf<String, MutableSet<LuceRight>>()
 
     init {
-        rights[owner] = ownerRights.toMutableSet()
+        rights[owner.toString()] = ownerRights.toMutableSet()
     }
 
 }

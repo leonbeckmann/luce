@@ -34,41 +34,41 @@ internal class PolicyDecisionPointTest {
     ) : LuceSubject<String>(identity, owner, setOf())
 
     class ExamplePmpPreFailure : PolicyManagementPoint {
-        override fun pullPolicy(): LucePolicy {
-            return LucePolicy(
+        override fun <Sid, Oid> pullPolicy(obj: LuceObject<Sid, Oid>, right: LuceRight): List<LucePolicy> {
+            return listOf(LucePolicy(
                 preAccess = Truth.FALSE,
                 postPermit = Truth.TRUE,
                 ongoingAccess = Truth.TRUE,
                 ongoingPeriod = 500,
                 postAccessEnded = Truth.TRUE,
                 postAccessRevoked = Truth.TRUE
-            )
+            ))
         }
     }
 
     class ExamplePmpOngoingSuccess : PolicyManagementPoint {
-        override fun pullPolicy(): LucePolicy {
-            return LucePolicy(
+        override fun <Sid, Oid> pullPolicy(obj: LuceObject<Sid, Oid>, right: LuceRight): List<LucePolicy> {
+            return listOf(LucePolicy(
                 preAccess = prolog { "father"("abraham", "Y") } ,
                 postPermit = Truth.TRUE,
                 ongoingAccess = Truth.TRUE,
                 ongoingPeriod = 500,
                 postAccessEnded = Truth.TRUE,
                 postAccessRevoked = Truth.TRUE
-            )
+            ))
         }
     }
 
     class ExamplePmpOngoingFailure : PolicyManagementPoint {
-        override fun pullPolicy(): LucePolicy {
-            return LucePolicy(
+        override fun <Sid, Oid> pullPolicy(obj: LuceObject<Sid, Oid>, right: LuceRight): List<LucePolicy> {
+            return listOf(LucePolicy(
                 preAccess = prolog { "father"("abraham", "Y") } ,
                 postPermit = Truth.TRUE,
                 ongoingAccess = Truth.FALSE,
                 ongoingPeriod = 500,
                 postAccessEnded = Truth.TRUE,
                 postAccessRevoked = Truth.TRUE
-            )
+            ))
         }
     }
 

@@ -1,0 +1,17 @@
+# from https://gist.github.com/kyledrake/d7457a46a03d7408da31
+
+# Generate self-signed root ca certificate and key
+openssl genrsa [-aes256] -out ca.key 2048
+openssl req -new -x509 -days 7300 -key ca.key -sha256 -extensions v3_ca -out ca.crt
+
+# Generate subject key
+openssl genrsa -out alice.key 2048
+
+# Generate CSR
+openssl req -sha256 -new -key alice.key -out alice.csr
+
+# Sign the CSR with your root ca key
+openssl x509 -sha256 -req -in alice.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out alice.crt -days 7300
+
+# Check signature:
+openssl verify -CAfile ca.crt alice.crt

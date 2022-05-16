@@ -1,5 +1,6 @@
 package core.logic
 
+import core.admin.LuceRight
 import core.control_flow_model.components.ComponentRegistry
 import core.control_flow_model.components.PolicyInformationPoint
 import core.exceptions.LuceException
@@ -52,7 +53,8 @@ class DefaultLibrary : AliasedLibrary {
         UsageNotification.descriptionPair,
         ActivateRole.descriptionPair,
         ResolveRolePermissions.descriptionPair,
-        Rpa.descriptionPair
+        Rpa.descriptionPair,
+        AuthorizedByRight.descriptionPair,
     )
 
     override val theory: Theory = ClausesParser.withDefaultOperators.parseTheory(
@@ -122,36 +124,46 @@ class DefaultLibrary : AliasedLibrary {
             return PrologList.of(out)
         }
     }
-/*
+
     /**
-     * pip_identifier/3
+     * is_authorized_by_rights/3
      *
-     * Expected format: intersection(+Atom1, +Atom2, ?Common)
-     * +Atom1: Atom
-     * +Atom2: Atom
-     * ?Common: Var or Atom
+     * Expected format: is_authorized_by_rights(+Atom, +Atom2, +Atom3)
+     * +Atom1: subject identity
+     * +Atom2: right id
+     * +Atom3: attr_pip:object.rights
      *
-     * A prolog predicate that unifies iff Common is the concatenation '<Atom1>:<Atom2>'
+     * A prolog predicate that checks if subject is allowed to access the object by right r (checks obj.rights map)
      */
-    object PipIdentifier : TernaryRelation.Functional<ExecutionContext>("pip_identifier") {
-        override fun Solve.Request<ExecutionContext>.computeOneSubstitution(
-            first: Term,
-            second: Term,
-            third: Term
-        ): Substitution {
+    object AuthorizedByRight : TernaryRelation.Predicative<ExecutionContext>("is_authorized_by_right") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term, third: Term): Boolean {
             ensuringArgumentIsAtom(0)
             ensuringArgumentIsAtom(1)
+            ensuringArgumentIsAtom(2)
 
-            return if (third is Var || third is Atom) {
-                Atom.of(first.castToAtom().value + ":" + second.castToAtom().value).mguWith(third)
-            } else {
-                ensuringArgumentIsVariable(2)
-                Substitution.failed()
+            // get obj.rights
+            when (val attr = resolveHelper(third.castToAtom().value, context)) {
+                is Map<*, *> -> when (val rights = attr[first.castToAtom().value]) {
+                    is Set<*> -> {
+                        return rights.contains(LuceRight(second.castToAtom().value))
+                    }
+                    else -> {
+                        throw SystemError.forUncaughtException(
+                            context,
+                            LuceException("Attribute is not a Map<String, List>")
+                        )
+                    }
+                }
+                else -> {
+                    throw SystemError.forUncaughtException(
+                        context,
+                        LuceException("Attribute is not a Map")
+                    )
+                }
             }
         }
-
     }
-*/
+
     /**
      * intersection/3
      *

@@ -199,7 +199,6 @@ internal class UsageControlTests {
             },
             SolveOptions.DEFAULT
         )
-        println(solution)
         assert(solution.isYes)
     }
 
