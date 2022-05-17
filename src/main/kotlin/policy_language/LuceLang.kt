@@ -86,16 +86,10 @@ class LuceLang  {
         @SerialName("usageNotification")
         data class UsageNotification(
             val monitor: String,
-            val timePip: String,
-            val subjectAttrPip: String,
-            val objectAttrPip: String
+            val timePip: String
         ) : Predicate() {
             override fun translate(): Struct = prolog {
-                val v1 = Var.of("X")
-                val v2 = Var.of("X")
-                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), v1) and
-                "resolve_string"(Atom.of("$subjectAttrPip:\$SUBJECT.identity"), v2) and
-                "purpose_notification"(Atom.of(timePip), v1, v2, Atom.of("\$RIGHT"), Atom.of(monitor))
+                "purpose_notification"(Atom.of(timePip), Atom.of("\$SUBJECT"), Atom.of("\$OBJECT"), Atom.of("\$RIGHT"), Atom.of(monitor))
             }
         }
 
@@ -186,21 +180,16 @@ class LuceLang  {
         @SerialName("rbac")
         data class Rbac(
             val subjectAttrPip: String,
-            val objectAttrPip: String,
-            val right: String
+            val objectAttrPip: String
         ) : Predicate() {
             override fun translate(): Struct = prolog {
                 val assignedRoles = Var.of("X")
                 val activeRoles = Var.of("X")
                 val rolePermissionAssignment = Var.of("X")
-
                 "resolve_string_list"("$subjectAttrPip:\$SUBJECT.assignedRoles", assignedRoles) and
-                "resolve_string_list"("$subjectAttrPip:\$SUBJECT.activeRoles", activeRoles) and
                 "resolve_role_permissions"("$objectAttrPip:\$OBJECT.rolePermissions", rolePermissionAssignment) and
-                "member"("R", assignedRoles) and
-                "not"("member"("R", activeRoles)) and
-                "rpa"("R", Atom.of(right), rolePermissionAssignment) and
-                "activate_role"("$subjectAttrPip:\$SUBJECT.activeRoles", "R")
+                "member"("R2", assignedRoles) and
+                "rpa"("R2", Atom.of("\$RIGHT"), rolePermissionAssignment)
             }
         }
 

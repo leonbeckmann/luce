@@ -18,6 +18,7 @@ import it.unibo.tuprolog.solve.primitive.*
 import it.unibo.tuprolog.theory.Theory
 import it.unibo.tuprolog.theory.parsing.ClausesParser
 import it.unibo.tuprolog.unify.Unificator.Companion.mguWith
+import org.slf4j.LoggerFactory
 import java.time.DayOfWeek
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -52,6 +53,7 @@ class DefaultLibrary : AliasedLibrary {
         NotifyMonitor.descriptionPair,
         UsageNotification.descriptionPair,
         ActivateRole.descriptionPair,
+        DeactivateRole.descriptionPair,
         ResolveRolePermissions.descriptionPair,
         Rpa.descriptionPair,
         AuthorizedByRight.descriptionPair,
@@ -84,6 +86,8 @@ class DefaultLibrary : AliasedLibrary {
     )
 
     companion object {
+
+        private val LOG = LoggerFactory.getLogger(DefaultLibrary::class.java)
 
         private fun getPip(id: String, context: ExecutionContext): PolicyInformationPoint {
             return ComponentRegistry.policyInformationPoints[id]
@@ -148,6 +152,9 @@ class DefaultLibrary : AliasedLibrary {
                         return rights.contains(LuceRight(second.castToAtom().value))
                     }
                     else -> {
+                        if (rights == null) {
+                            return false
+                        }
                         throw SystemError.forUncaughtException(
                             context,
                             LuceException("Attribute is not a Map<String, List>")
@@ -298,6 +305,10 @@ class DefaultLibrary : AliasedLibrary {
             ensuringArgumentIsAtom(0)
             ensuringArgumentIsVariable(1)
 
+            if (LOG.isTraceEnabled) {
+                LOG.trace("resolve_string called with arguments: $first, $second")
+            }
+
             return when (val attrVal = resolveHelper(first.castToAtom().value, context)) {
                 is String -> Atom.of(attrVal).mguWith(second)
                 else -> {
@@ -329,6 +340,10 @@ class DefaultLibrary : AliasedLibrary {
 
             return when (val attrVal = resolveHelper(first.castToAtom().value, context)) {
                 is List<*> -> {
+                    val inList = attrVal.filterIsInstance<String>().map { x -> Atom.of(x) }
+                    PrologList.of(inList).mguWith(second)
+                }
+                is Set<*> -> {
                     val inList = attrVal.filterIsInstance<String>().map { x -> Atom.of(x) }
                     PrologList.of(inList).mguWith(second)
                 }
@@ -591,6 +606,29 @@ class DefaultLibrary : AliasedLibrary {
             val pip = getPip(pipId, context)
 
             return pip.updateInformation(attrId, "append", second.castToAtom().value)
+        }
+    }
+
+    /**
+     * deactivate_role/3
+     *
+     * Expected format: activate_role(+Atom1, +Atom2)
+     * +Atom1: pip:attr
+     * +Atom2: role
+     *
+     * A prolog predicate that deactivates a user RBAC role
+     *
+     * @return: true iff role is deactivated
+     */
+    object DeactivateRole : BinaryRelation.Predicative<ExecutionContext>("deactivate_role") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term): Boolean {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsAtom(1)
+
+            val (pipId, attrId) = splitIdentifier(first.castToAtom().value, context)
+            val pip = getPip(pipId, context)
+
+            return pip.updateInformation(attrId, "remove", second.castToAtom().value)
         }
     }
 

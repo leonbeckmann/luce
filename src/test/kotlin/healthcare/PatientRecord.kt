@@ -6,8 +6,8 @@ import java.security.cert.X509Certificate
 
 class PatientRecord(
     identity: String,
-    owner: X509Certificate
-) : LuceObject<X509Certificate, String>(identity, owner, "Record", recordRights) {
+    owner: String
+) : LuceObject<String, String>(identity, owner, "Record", recordRights) {
 
     companion object {
         const val RECORD_RIGHT_ID_READ = "read"

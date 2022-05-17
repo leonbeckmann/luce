@@ -42,9 +42,7 @@ internal class LuceLangTest {
         assert(
             usageNotification is LuceLang.Predicate.UsageNotification &&
                     usageNotification.monitor == "monitor" &&
-                    usageNotification.timePip == "pip_time1" &&
-                    usageNotification.subjectAttrPip == "pip_attr1" &&
-                    usageNotification.objectAttrPip == "pip_attr1"
+                    usageNotification.timePip == "pip_time1"
         )
         val triggers = json.policy.ongoingAccess.triggers
         assert(triggers.size == 1)
@@ -57,9 +55,7 @@ internal class LuceLangTest {
         assert(
             usageNotification2 is LuceLang.Predicate.UsageNotification &&
                     usageNotification2.monitor == "monitor" &&
-                    usageNotification2.timePip == "pip_time1" &&
-                    usageNotification2.subjectAttrPip == "pip_attr1" &&
-                    usageNotification2.objectAttrPip == "pip_attr1"
+                    usageNotification2.timePip == "pip_time1"
         )
         val postAccess = json.policy.postAccess.predicates
         assert(postAccess.size == 1)

@@ -45,9 +45,7 @@
         {
           "type" : "usageNotification",
           "monitor" : "monitor",
-          "timePip" : "pip_time1",
-          "subjectAttrPip" : "pip_attr1",
-          "objectAttrPip" : "pip_attr1"
+          "timePip" : "pip_time1"
         }
       ]
     },
@@ -62,9 +60,7 @@
         {
           "type" : "usageNotification",
           "monitor" : "monitor",
-          "timePip" : "pip_time1",
-          "subjectAttrPip" : "pip_attr1",
-          "objectAttrPip" : "pip_attr1"
+          "timePip" : "pip_time1"
         },
         {
           "type" : "dayTime",

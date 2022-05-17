@@ -2,12 +2,19 @@ package healthcare
 
 import core.admin.LuceRight
 import core.control_flow_model.components.ComponentRegistry
+import core.control_flow_model.components.PolicyInformationPoint
+import core.notification.MonitorClient
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import policy_language.LuceLang
 import java.io.FileInputStream
 import java.security.SignatureException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 /**
  * Representing the Healthcare Test from Section 5.2.2:
@@ -35,6 +42,12 @@ import java.security.cert.X509Certificate
  */
 class HealthcareTest {
 
+    /*
+    companion object {
+        private val LOG = LoggerFactory.getLogger(HealthcareTest::class.java)
+    }
+    */
+
     /**
      * Read X509Certificate from test resource folder
      */
@@ -47,44 +60,69 @@ class HealthcareTest {
     @Test
     fun integrationTest() {
 
+        // enable trace logging
+        // System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "trace")
+
         // create the root authority: health management facility
+        // LOG.info("Create healthcare management facility")
         val healthMgmtFacility = HealthManagementFacility(readCertificate("identities/ca.crt"))
-        healthMgmtFacility.identity.verify(healthMgmtFacility.identity.publicKey)
+        healthMgmtFacility.cert.verify(healthMgmtFacility.cert.publicKey)
 
         // register healthMgmtFacility as PMP and attr PIP
+        // LOG.info("Register PMP, PIPs and Monitor Services")
         ComponentRegistry.policyManagementPoint = healthMgmtFacility
         ComponentRegistry.addPolicyInformationPoint("attr_pip", healthMgmtFacility)
+        ComponentRegistry.addPolicyInformationPoint("time_pip", object : PolicyInformationPoint {
+            override fun queryInformation(identifier: Any): Long {
+                return LocalDateTime.now(ZoneOffset.UTC).toEpochSecond(ZoneOffset.UTC)
+            }
+
+            override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
+        })
+        MonitorClient.register("default_notification_service", object : MonitorClient {
+            override fun notify(notification: String): Boolean {
+                println("Notification from default_notification_service: $notification")
+                return true
+            }
+        })
 
         // create hospital
-        val hospital = healthMgmtFacility.registerSubject(readCertificate("identities/hospital.crt"))
-        hospital.identity.verify(healthMgmtFacility.identity.publicKey)
+        // LOG.info("Create hospital")
+        val hospital = healthMgmtFacility.registerSubject("Hospital", readCertificate("identities/hospital.crt"))
+        hospital.cert.verify(healthMgmtFacility.cert.publicKey)
 
         // create hospital employees (Doctor, Nurse)
-        val doctor = healthMgmtFacility.registerSubject(readCertificate("identities/doctor.crt"))
-        doctor.identity.verify(healthMgmtFacility.identity.publicKey)
-        val nurse = healthMgmtFacility.registerSubject(readCertificate("identities/nurse.crt"))
-        nurse.identity.verify(healthMgmtFacility.identity.publicKey)
+        // LOG.info("Create Doctor and Nurse")
+        val doctor = healthMgmtFacility.registerSubject("Doctor1", readCertificate("identities/doctor.crt"))
+        doctor.cert.verify(healthMgmtFacility.cert.publicKey)
+        val nurse = healthMgmtFacility.registerSubject("Nurse1", readCertificate("identities/nurse.crt"))
+        nurse.cert.verify(healthMgmtFacility.cert.publicKey)
 
         // create patient Alice
-        val alice = healthMgmtFacility.registerSubject(readCertificate("identities/alice.crt"))
-        alice.identity.verify(healthMgmtFacility.identity.publicKey)
+        // LOG.info("Create Alice")
+        val alice = healthMgmtFacility.registerSubject("Alice", readCertificate("identities/alice.crt"))
+        alice.cert.verify(healthMgmtFacility.cert.publicKey)
 
         // create legal representative Bob
-        val bob = healthMgmtFacility.registerSubject(readCertificate("identities/bob.crt"))
-        bob.identity.verify(healthMgmtFacility.identity.publicKey)
+        // LOG.info("Create legal representative Bob")
+        val bob = healthMgmtFacility.registerSubject("Bob", readCertificate("identities/bob.crt"))
+        bob.cert.verify(healthMgmtFacility.cert.publicKey)
 
         assertThrows<SignatureException> {
-            bob.identity.verify(alice.identity.publicKey)
+            bob.cert.verify(alice.cert.publicKey)
         }
 
         // assign doctor and nurse to hospital organization
+        // LOG.info("Assign roles to Doctor and Nurse")
         assert(healthMgmtFacility.assignRole(hospital.identity, doctor.identity, "Doctor"))
         assert(healthMgmtFacility.assignRole(hospital.identity, nurse.identity, "Nurse"))
 
         // create empty record for alice
+        // LOG.info("Create record for Alice")
         assert(healthMgmtFacility.createEmptyRecord(alice.identity))
 
         // ensure alice can read her record, i.e. no exception
+        // LOG.info("Ensure Alice can read her record")
         val listenerAliceRead = UsageListener()
         val handleAliceRead = healthMgmtFacility.accessRecord(
             alice.identity,
@@ -94,6 +132,7 @@ class HealthcareTest {
         )
         listenerAliceRead.setHandle(handleAliceRead)
         handleAliceRead.drop(false)
+
 
         // ensure bob cannot read alice's record yet
         assertThrows<HealthcareException> {
@@ -105,7 +144,89 @@ class HealthcareTest {
             )
         }
 
-        // ensure doctor cannot read alice's record yet
+        // ensure doctor cannot read-partially alice's record yet
+        assertThrows<HealthcareException> {
+            healthMgmtFacility.accessRecord(
+                doctor.identity,
+                alice.identity,
+                LuceRight(PatientRecord.RECORD_RIGHT_ID_READ_PARTIAL),
+                UsageListener()
+            )
+        }
+
+        // deploy policy that allows doctor and nurse to access the record
+        // ensure alice can read her record, i.e. no exception
+        // LOG.info("Deploy Usage Policy as Alice for her record to allow role-based usage for Doctor and Nurse")
+        val listenerAlicePolicy = UsageListener()
+        val handleAlicePolicy = healthMgmtFacility.accessRecord(
+            alice.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_CREATE_POLICY),
+            listenerAlicePolicy
+        )
+        listenerAlicePolicy.setHandle(handleAlicePolicy)
+
+        // create and deploy policy
+        val policyAlice = LuceLang.Policy(
+            id = "policyAlice1",
+            issuer = alice.identity,
+            contexts = setOf(LuceLang.PolicyContext.ObjectId(handleAlicePolicy.recordId()!!)),
+            rights = setOf(PatientRecord.RECORD_RIGHT_ID_READ_PARTIAL, PatientRecord.RECORD_RIGHT_ID_APPEND),
+            preAccess = LuceLang.PreAccess(
+                predicates = listOf(
+                    LuceLang.Predicate.Rbac(
+                        "attr_pip",
+                        "attr_pip"
+                    ),
+                    LuceLang.Predicate.UsageNotification(
+                        "default_notification_service",
+                        "time_pip"
+                    )
+                )
+            ),
+            ongoingAccess = LuceLang.OnAccess(
+                triggers = listOf(LuceLang.Trigger.PeriodicTrigger(5000L)),
+                predicates = listOf(LuceLang.Predicate.Rbac("attr_pip", "attr_pip"))
+            ),
+            postAccess = LuceLang.PostAccess(
+                predicates = listOf()
+            ),
+            postRevocation = LuceLang.PostRevocation(
+                predicates = listOf()
+            ),
+        )
+
+        val signatureAlice = "signature" // TODO sign
+        val policyWrapperAlice = LuceLang.PolicyWrapper(policyAlice, signatureAlice)
+        healthMgmtFacility.deployPolicy(Json.encodeToString(policyWrapperAlice))
+
+        // drop handle
+        handleAlicePolicy.drop(false)
+
+        // ensure doctor can append
+        // LOG.info("Ensure Doctor can now append Alice's record")
+        val listenerDoctorAppend = UsageListener()
+        val handleDoctorAppend = healthMgmtFacility.accessRecord(
+            doctor.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_APPEND),
+            listenerDoctorAppend
+        )
+        listenerDoctorAppend.setHandle(handleDoctorAppend)
+        handleDoctorAppend.drop(false)
+
+        // ensure nurse can partially read
+        val listenerNurseReadPartial = UsageListener()
+        val handleNurseReadPartial = healthMgmtFacility.accessRecord(
+            nurse.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_READ_PARTIAL),
+            listenerNurseReadPartial
+        )
+        listenerNurseReadPartial.setHandle(handleNurseReadPartial)
+        handleNurseReadPartial.drop(false)
+
+        // ensure doctor cannot fully read
         assertThrows<HealthcareException> {
             healthMgmtFacility.accessRecord(
                 doctor.identity,
@@ -115,15 +236,36 @@ class HealthcareTest {
             )
         }
 
-        // TODO
-        // deploy policy that allows doctor and nurse to access the record
-
-        // ensure doctor can append and partially read, but cannot fully read
-
         // delegate rights to Bob
+        val listenerAliceDelegate = UsageListener()
+        val handleAliceDelegate = healthMgmtFacility.accessRecord(
+            alice.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_DELEGATE_RIGHT),
+            listenerAliceDelegate
+        )
+        listenerAliceDelegate.setHandle(handleAliceDelegate)
+        // delegate rights to Bob
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_CREATE_POLICY)))
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_DELEGATE_RIGHT)))
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_READ)))
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_READ_PARTIAL)))
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_APPEND)))
+        assert(handleAliceDelegate.delegateRight(bob.identity, LuceRight(PatientRecord.RECORD_RIGHT_ID_DELETE_LOCAL)))
+        handleAliceDelegate.drop(false)
 
         // ensure Bob can deploy policy that allows the doctor to read the record for 10 seconds under the condition
-        // that local copies are deleted afterwards
+        //   that local copies are deleted afterwards
+        val listenerBobPolicy = UsageListener()
+        val handleBobPolicy = healthMgmtFacility.accessRecord(
+            bob.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_CREATE_POLICY),
+            listenerBobPolicy
+        )
+        listenerBobPolicy.setHandle(handleBobPolicy)
+        // TODO create policy
+        handleBobPolicy.drop(false)
 
         // ensure doctor can fully read the record
 
