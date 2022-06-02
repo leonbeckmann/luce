@@ -93,8 +93,6 @@ class LuceLang  {
             }
         }
 
-        // TODO format
-
         @Serializable
         @SerialName("timeInterval")
         data class TimeIntervalRestriction(
@@ -122,7 +120,7 @@ class LuceLang  {
             val timePip : String,
             val startTime: String,  // ISO_LOCAL_DATE_TIME
             val duration: Long,     // seconds
-            val timeZone: String
+            val timeZone: String    // ZoneId.id
         ) : Predicate() {
             override fun translate(): Struct {
                 val startTime = LocalDateTime.parse(startTime, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -184,7 +182,6 @@ class LuceLang  {
         ) : Predicate() {
             override fun translate(): Struct = prolog {
                 val assignedRoles = Var.of("X")
-                val activeRoles = Var.of("X")
                 val rolePermissionAssignment = Var.of("X")
                 "resolve_string_list"("$subjectAttrPip:\$SUBJECT.assignedRoles", assignedRoles) and
                 "resolve_role_permissions"("$objectAttrPip:\$OBJECT.rolePermissions", rolePermissionAssignment) and

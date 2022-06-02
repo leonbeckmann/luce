@@ -101,9 +101,6 @@ object SessionPip {
             LOG.trace("Remove usage session with id=${session.id}")
         }
 
-        // cancel reevaluation timer
-        session.cancelTimer()
-
         // remove the session from the map to avoid race conditions that could occur after we check for waiters
         sessions.remove(session.id)
 

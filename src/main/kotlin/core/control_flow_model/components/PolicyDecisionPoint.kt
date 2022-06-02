@@ -182,6 +182,7 @@ class PolicyDecisionPoint {
                     }
 
                     // revoke the usage on failure
+                    session.cancelTimer()
                     session.feedEvent(UsageSession.Event.RevokeAccess)
                     assert(session.state is UsageSession.State.Revoked)
                     val revokeSolution = PolicyEvaluator.evaluate(
@@ -232,7 +233,8 @@ class PolicyDecisionPoint {
                 LOG.trace("Start post-access policy evaluation")
             }
 
-            // revoke the usage on failure
+            // end the usage
+            session.cancelTimer()
             session.feedEvent(UsageSession.Event.EndAccess)
             assert(session.state is UsageSession.State.End)
             val endSolution = PolicyEvaluator.evaluate(
