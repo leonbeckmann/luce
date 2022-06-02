@@ -3,6 +3,8 @@ package core.policies
 import it.unibo.tuprolog.core.Atom
 import it.unibo.tuprolog.core.Struct
 import it.unibo.tuprolog.core.Term
+import it.unibo.tuprolog.dsl.prolog
+import kotlin.math.min
 
 /**
  * Low-level LUCE policy
@@ -24,7 +26,18 @@ class LucePolicy(
      * @return A fresh policy, combining this and the given policy
      */
     fun mergeByConjunction(policy: LucePolicy) : LucePolicy {
-        TODO("Not yet implemented")
+        val period = if (ongoingPeriod != null && policy.ongoingPeriod != null) {
+            min(ongoingPeriod, policy.ongoingPeriod)
+        } else ongoingPeriod ?: policy.ongoingPeriod
+
+        return LucePolicy(
+            preAccess = prolog { preAccess and policy.preAccess },
+            postPermit = prolog { postPermit and policy.postPermit },
+            ongoingAccess = prolog { ongoingAccess and policy.ongoingAccess },
+            ongoingPeriod = period,
+            postAccessEnded = prolog { postAccessEnded and policy.postAccessEnded },
+            postAccessRevoked = prolog { postAccessRevoked and policy.postAccessRevoked }
+        )
     }
 
     /**
