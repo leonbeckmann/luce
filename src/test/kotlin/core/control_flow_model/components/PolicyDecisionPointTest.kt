@@ -76,6 +76,8 @@ internal class PolicyDecisionPointTest {
         override fun onRevocation(response: RevocationResponse) {
             latch.countDown()
         }
+
+        override fun doDependency(dependencyId: String): Boolean = true
     }
 
     companion object {

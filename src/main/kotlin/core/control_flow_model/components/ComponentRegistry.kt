@@ -25,4 +25,11 @@ object ComponentRegistry {
         policyInformationPoints[id] = pip
     }
 
+    fun removePolicyInformationPoint(id: String) {
+        if (LOG.isTraceEnabled) {
+            LOG.trace("Unregister PIP with id=$id")
+        }
+        policyInformationPoints.remove(id)
+    }
+
 }

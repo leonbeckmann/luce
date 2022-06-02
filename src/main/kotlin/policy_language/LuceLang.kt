@@ -191,6 +191,16 @@ class LuceLang  {
         }
 
         @Serializable
+        @SerialName("dependency")
+        data class Dependency(
+            val descriptor: String
+        ) : Predicate() {
+            override fun translate(): Struct = prolog {
+                "dependency"(descriptor, "\$OBJECT\$SUBJECT\$RIGHT")
+            }
+        }
+
+        @Serializable
         @SerialName("custom")
         data class Custom(
             val functor: String,

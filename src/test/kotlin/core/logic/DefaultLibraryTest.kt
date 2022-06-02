@@ -1,7 +1,9 @@
 package core.logic
 
 import core.control_flow_model.components.ComponentRegistry
+import core.control_flow_model.components.PolicyEnforcementPoint
 import core.control_flow_model.components.PolicyInformationPoint
+import core.control_flow_model.messages.RevocationResponse
 import it.unibo.tuprolog.core.Atom
 import it.unibo.tuprolog.dsl.prolog
 import it.unibo.tuprolog.core.List as PrologList
@@ -141,4 +143,35 @@ internal class DefaultLibraryTest {
         )
         assert(solution.isYes)
     }*/
+
+    @Test
+    fun testDependency() {
+        val solution = PolicyEvaluator.evaluate(
+            prolog { "dependency"("delete_local", "invalid_session_id") },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isHalt)
+
+        var dependencySuccessful = false
+
+        ComponentRegistry.addPolicyInformationPoint("session1", object : PolicyInformationPoint {
+            override fun queryInformation(identifier: Any): PolicyEnforcementPoint {
+                return object : PolicyEnforcementPoint {
+                    override fun onRevocation(response: RevocationResponse) {}
+                    override fun doDependency(dependencyId: String): Boolean {
+                        dependencySuccessful = true
+                        return true
+                    }
+                }
+            }
+
+            override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
+        })
+
+        val solution2 = PolicyEvaluator.evaluate(
+            prolog { "dependency"("delete_local", "session1") },
+            SolveOptions.DEFAULT
+        )
+        assert(solution2.isYes && dependencySuccessful)
+    }
 }

@@ -57,4 +57,6 @@ class RecordHandle(
         lock.unlock()
     }
 
+    fun isRevoked() : Boolean = data == null
+
 }

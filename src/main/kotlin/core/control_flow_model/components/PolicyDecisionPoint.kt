@@ -2,7 +2,6 @@ package core.control_flow_model.components
 
 import core.control_flow_model.messages.*
 import core.exceptions.InUseException
-import core.exceptions.LuceException
 import core.logic.PolicyEvaluator
 import core.usage_decision_process.SessionPip
 import core.usage_decision_process.UsageSession
@@ -57,7 +56,22 @@ class PolicyDecisionPoint {
 
             // get generic policies from PMP (all that are applicable)
             val genericPolicies = ComponentRegistry.policyManagementPoint.pullPolicy(request.luceObject, request.luceRight)
-            if (genericPolicies.isEmpty()) throw LuceException("Policy is missing")
+            if (genericPolicies.isEmpty()) {
+                LOG.warn("Missing policy for session=$sessionId")
+                session.feedEvent(UsageSession.Event.DenyAccess)
+                assert(session.state is UsageSession.State.Error)
+                SessionPip.finishLock(session)
+                return DecisionResponse.DENIED
+            }
+
+            // register PIP for retrieving PEP in policy evaluation to signal dependency requirements to the user
+            ComponentRegistry.addPolicyInformationPoint(sessionId, object : PolicyInformationPoint {
+                override fun queryInformation(identifier: Any): PolicyEnforcementPoint {
+                    return request.listener
+                }
+
+                override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
+            })
 
             // iterate over policies until one is applicable
             for (genericPolicy in genericPolicies.listIterator()) {
@@ -198,7 +212,7 @@ class PolicyDecisionPoint {
                     SessionPip.finishLock(session)
 
                     // notify listener
-                    // TODO logic
+                    // TODO logic -> revokeSolution
                     listener.onRevocation(RevocationResponse())
                 }
             }
@@ -249,7 +263,7 @@ class PolicyDecisionPoint {
             // end usage
             SessionPip.finishLock(session)
 
-            // TODO logic
+            // TODO logic -> endSolution
             return EndResponse()
         }
 

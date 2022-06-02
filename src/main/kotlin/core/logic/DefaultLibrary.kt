@@ -2,6 +2,7 @@ package core.logic
 
 import core.admin.LuceRight
 import core.control_flow_model.components.ComponentRegistry
+import core.control_flow_model.components.PolicyEnforcementPoint
 import core.control_flow_model.components.PolicyInformationPoint
 import core.exceptions.LuceException
 import core.notification.MonitorClient
@@ -57,6 +58,7 @@ class DefaultLibrary : AliasedLibrary {
         ResolveRolePermissions.descriptionPair,
         Rpa.descriptionPair,
         AuthorizedByRight.descriptionPair,
+        Dependency.descriptionPair,
     )
 
     override val theory: Theory = ClausesParser.withDefaultOperators.parseTheory(
@@ -724,6 +726,28 @@ class DefaultLibrary : AliasedLibrary {
 
             }
             // when we reach this, then role was not available in the rp list
+            return false
+        }
+    }
+
+    /**
+     * dependency/2
+     *
+     * Expected format: dependency(+Atom1, +Atom2)
+     * +Atom1: dependency descriptor
+     * +Atom2: sessionId for requesting PEP
+     *
+     * @return: true iff dependency was successfully executed
+     */
+    object Dependency : BinaryRelation.Predicative<ExecutionContext>("dependency") {
+        override fun Solve.Request<ExecutionContext>.compute(first: Term, second: Term): Boolean {
+            ensuringArgumentIsAtom(0)
+            ensuringArgumentIsAtom(1)
+
+            val pep = getPip(second.castToAtom().value, context).queryInformation("")
+            if (pep is PolicyEnforcementPoint) {
+                return pep.doDependency(first.castToAtom().value)
+            }
             return false
         }
     }

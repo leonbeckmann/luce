@@ -36,6 +36,7 @@ internal class UsageSessionTest {
         val policy = LucePolicy(Truth.TRUE, Truth.TRUE, Truth.TRUE, 5, Truth.TRUE, Truth.TRUE)
         val pep = object : PolicyEnforcementPoint {
             override fun onRevocation(response: RevocationResponse) {}
+            override fun doDependency(dependencyId: String): Boolean = true
         }
 
         // check transitions

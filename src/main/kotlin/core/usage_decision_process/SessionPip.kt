@@ -1,5 +1,6 @@
 package core.usage_decision_process
 
+import core.control_flow_model.components.ComponentRegistry
 import core.exceptions.InUseException
 import core.exceptions.LuceException
 import org.slf4j.LoggerFactory
@@ -103,6 +104,7 @@ object SessionPip {
 
         // remove the session from the map to avoid race conditions that could occur after we check for waiters
         sessions.remove(session.id)
+        ComponentRegistry.removePolicyInformationPoint(session.id)
 
         // check if there are other waiters, if so reset the session to initial config
         if (session.lock.hasQueuedThreads()) {

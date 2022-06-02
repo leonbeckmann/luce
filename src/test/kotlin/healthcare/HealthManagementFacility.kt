@@ -92,7 +92,8 @@ class HealthManagementFacility(
         attributes["${record.identity}.rights"] = record.rights
         attributes["${record.identity}.rolePermissions"] = listOf(
             Pair("Hospital:Nurse", listOf(PatientRecord.RECORD_RIGHT_ID_READ_PARTIAL, PatientRecord.RECORD_RIGHT_ID_DELETE_LOCAL)),
-            Pair("Hospital:Doctor", listOf(PatientRecord.RECORD_RIGHT_ID_APPEND))
+            Pair("Hospital:Doctor", listOf(PatientRecord.RECORD_RIGHT_ID_APPEND)),
+            Pair("Hospital:Emergency", listOf(PatientRecord.RECORD_RIGHT_ID_READ))
         )
 
         return true

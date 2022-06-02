@@ -14,7 +14,9 @@ import java.security.SignatureException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * Representing the Healthcare Test from Section 5.2.2:
@@ -61,7 +63,7 @@ class HealthcareTest {
     fun integrationTest() {
 
         // enable trace logging
-        // System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "trace")
+        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "trace")
 
         // create the root authority: health management facility
         // LOG.info("Create healthcare management facility")
@@ -196,7 +198,7 @@ class HealthcareTest {
             ),
         )
 
-        val signatureAlice = "signature" // TODO sign
+        val signatureAlice = "signature" // TODO sign with private key
         val policyWrapperAlice = LuceLang.PolicyWrapper(policyAlice, signatureAlice)
         healthMgmtFacility.deployPolicy(Json.encodeToString(policyWrapperAlice))
 
@@ -264,14 +266,78 @@ class HealthcareTest {
             listenerBobPolicy
         )
         listenerBobPolicy.setHandle(handleBobPolicy)
-        // TODO create policy
+        // create and deploy policy
+        val now = LocalDateTime.now()
+        val policyBob = LuceLang.Policy(
+            id = "policyBob1",
+            issuer = bob.identity,
+            contexts = setOf(LuceLang.PolicyContext.ObjectId(handleBobPolicy.recordId()!!)),
+            rights = setOf(PatientRecord.RECORD_RIGHT_ID_READ),
+            preAccess = LuceLang.PreAccess(
+                predicates = listOf(
+                    LuceLang.Predicate.Rbac(
+                        "attr_pip",
+                        "attr_pip"
+                    ),
+                    LuceLang.Predicate.DurationRestriction(
+                        "time_pip",
+                        now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        1L,
+                        ZoneId.systemDefault().id
+                    ),
+                    LuceLang.Predicate.UsageNotification(
+                        "default_notification_service",
+                        "time_pip"
+                    )
+                )
+            ),
+            ongoingAccess = LuceLang.OnAccess(
+                triggers = listOf(LuceLang.Trigger.PeriodicTrigger(500L)),
+                predicates = listOf(
+                    LuceLang.Predicate.Rbac("attr_pip", "attr_pip"),
+                    LuceLang.Predicate.DurationRestriction(
+                        "time_pip",
+                        now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                        1L,
+                        ZoneId.systemDefault().id
+                    ),
+                )
+            ),
+            postAccess = LuceLang.PostAccess(
+                predicates = listOf(
+                    LuceLang.Predicate.Dependency("delete_local")
+                )
+            ),
+            postRevocation = LuceLang.PostRevocation(
+                predicates = listOf(
+                    LuceLang.Predicate.Dependency("delete_local")
+                )
+            ),
+        )
+
+        val signatureBob = "signature" // TODO sign with private key
+        val policyWrapperBob = LuceLang.PolicyWrapper(policyBob, signatureBob)
+        healthMgmtFacility.deployPolicy(Json.encodeToString(policyWrapperBob))
         handleBobPolicy.drop(false)
 
         // ensure doctor can fully read the record
+        // problem: 'read' is not in rbac rpa -> assign emergency role to doctor
+        healthMgmtFacility.assignRole(hospital.identity, doctor.identity, "Emergency")
+        val listenerDoctorRead = UsageListener()
+        val handleDoctorRead = healthMgmtFacility.accessRecord(
+            doctor.identity,
+            alice.identity,
+            LuceRight(PatientRecord.RECORD_RIGHT_ID_READ),
+            listenerDoctorRead
+        )
+        listenerDoctorRead.setHandle(handleDoctorRead)
+        // wait until revocation
+        Thread.sleep(1500)
+        assert(handleDoctorRead.isRevoked())
 
-        // ensure the local copy is deleted after the usage
+        // TODO ensure the local copy is deleted after the usage
 
         // ensure the doctor cannot read the full record anymore, since usage interval is over
-
+        // TODO
     }
 }

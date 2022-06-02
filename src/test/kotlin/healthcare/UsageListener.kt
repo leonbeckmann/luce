@@ -14,4 +14,12 @@ class UsageListener : PolicyEnforcementPoint {
     override fun onRevocation(response: RevocationResponse) {
         handle.drop(true)
     }
+
+    override fun doDependency(dependencyId: String): Boolean {
+        assert(dependencyId == "delete_local")
+        // TODO request if we are allowed to delete
+        // TODO delete
+        // TODO return dependency result
+        return true
+    }
 }
