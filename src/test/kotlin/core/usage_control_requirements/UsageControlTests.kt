@@ -1,7 +1,9 @@
 package core.usage_control_requirements
 
 import core.control_flow_model.components.ComponentRegistry
+import core.control_flow_model.components.PolicyEnforcementPoint
 import core.control_flow_model.components.PolicyInformationPoint
+import core.control_flow_model.messages.RevocationResponse
 import core.logic.PolicyEvaluator
 import core.notification.MonitorClient
 import it.unibo.tuprolog.dsl.prolog
@@ -146,6 +148,31 @@ internal class UsageControlTests {
 
             // Notification Monitor
             MonitorClient.register(DefaultNotification.id(), DefaultNotification())
+
+            // Dependency PIPs
+            ComponentRegistry.addPolicyInformationPoint("session1", object : PolicyInformationPoint {
+                override fun queryInformation(identifier: Any): PolicyEnforcementPoint {
+                    return object : PolicyEnforcementPoint {
+                        override fun onRevocation(response: RevocationResponse) {}
+
+                        override fun doDependency(dependencyId: String): Boolean = false
+                    }
+                }
+
+                override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean  = false
+            })
+
+            ComponentRegistry.addPolicyInformationPoint("session2", object : PolicyInformationPoint {
+                override fun queryInformation(identifier: Any): PolicyEnforcementPoint {
+                    return object : PolicyEnforcementPoint {
+                        override fun onRevocation(response: RevocationResponse) {}
+
+                        override fun doDependency(dependencyId: String): Boolean = true
+                    }
+                }
+
+                override fun updateInformation(identifier: Any, description: String, value: Any?): Boolean = false
+            })
         }
 
     }
@@ -389,10 +416,40 @@ internal class UsageControlTests {
     /**
      * U11 - Modification of Data
      */
-    // TODO
+    @Test
+    fun testModificationOfData() {
+        // dependency success
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "dependency"("anonymize", "session2")
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+    }
 
     /**
      * U12 - Deletion after Usage
      */
-    // TODO
+    @Test
+    fun testDeletionAfterUsage() {
+        // with notification due to dependency failure
+        val solution = PolicyEvaluator.evaluate(
+            prolog {
+                "dependency"("delete_local", "session1") or
+                "notify_monitor"("dependency failed", DefaultNotification.id())
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution.isYes)
+
+        // without notification, dependency success
+        val solution2 = PolicyEvaluator.evaluate(
+            prolog {
+                "dependency"("delete_local", "session2")
+            },
+            SolveOptions.DEFAULT
+        )
+        assert(solution2.isYes)
+    }
 }

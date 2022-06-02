@@ -1,3 +1,5 @@
 package core.control_flow_model.messages
 
-class EndResponse
+import it.unibo.tuprolog.solve.Solution
+
+class EndResponse(val solution: Solution)

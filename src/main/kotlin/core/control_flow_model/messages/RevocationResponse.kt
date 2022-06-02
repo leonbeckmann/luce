@@ -1,3 +1,5 @@
 package core.control_flow_model.messages
 
-class RevocationResponse
+import it.unibo.tuprolog.solve.Solution
+
+class RevocationResponse(val solution: Solution)

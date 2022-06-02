@@ -48,7 +48,7 @@ class RecordHandle(
                 val request = EndRequest(data!!.subject, data!!.record, data!!.right)
 
                 // end usage
-                PolicyDecisionPoint.endUsage(request)
+                assert(PolicyDecisionPoint.endUsage(request).solution.isYes)
             }
 
             // make handle unusable

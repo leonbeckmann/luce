@@ -202,6 +202,35 @@ class HealthcareTest {
         val policyWrapperAlice = LuceLang.PolicyWrapper(policyAlice, signatureAlice)
         healthMgmtFacility.deployPolicy(Json.encodeToString(policyWrapperAlice))
 
+        // deploy a second that allows local deletion for everyone
+        val policyAlice2 = LuceLang.Policy(
+            id = "policyAlice2",
+            issuer = alice.identity,
+            contexts = setOf(LuceLang.PolicyContext.ObjectId(handleAlicePolicy.recordId()!!)),
+            rights = setOf(PatientRecord.RECORD_RIGHT_ID_DELETE_LOCAL),
+            preAccess = LuceLang.PreAccess(
+                predicates = listOf(
+                    LuceLang.Predicate.UsageNotification(
+                        "default_notification_service",
+                        "time_pip"
+                    )
+                )
+            ),
+            ongoingAccess = LuceLang.OnAccess(
+                triggers = listOf(),
+                predicates = listOf()
+            ),
+            postAccess = LuceLang.PostAccess(
+                predicates = listOf()
+            ),
+            postRevocation = LuceLang.PostRevocation(
+                predicates = listOf()
+            ),
+        )
+        val signatureAlice2 = "signature" // TODO sign with private key
+        val policyWrapperAlice2 = LuceLang.PolicyWrapper(policyAlice2, signatureAlice2)
+        healthMgmtFacility.deployPolicy(Json.encodeToString(policyWrapperAlice2))
+
         // drop handle
         handleAlicePolicy.drop(false)
 
@@ -323,7 +352,21 @@ class HealthcareTest {
         // ensure doctor can fully read the record
         // problem: 'read' is not in rbac rpa -> assign emergency role to doctor
         healthMgmtFacility.assignRole(hospital.identity, doctor.identity, "Emergency")
+        // provide a delete_local dependency procedure, that deletes the
         val listenerDoctorRead = UsageListener()
+        var deleted = false
+        listenerDoctorRead.setDeletionProcedure {
+            val handleDoctorDelete = healthMgmtFacility.accessRecord(
+                doctor.identity,
+                alice.identity,
+                LuceRight(PatientRecord.RECORD_RIGHT_ID_DELETE_LOCAL),
+                UsageListener()
+            )
+            // allowed to delete the local copies
+            deleted = true
+            handleDoctorDelete.drop(false)
+            true
+        }
         val handleDoctorRead = healthMgmtFacility.accessRecord(
             doctor.identity,
             alice.identity,
@@ -335,9 +378,17 @@ class HealthcareTest {
         Thread.sleep(1500)
         assert(handleDoctorRead.isRevoked())
 
-        // TODO ensure the local copy is deleted after the usage
+        // ensure the local copy is deleted after the usage
+        assert(deleted)
 
         // ensure the doctor cannot read the full record anymore, since usage interval is over
-        // TODO
+        assertThrows<HealthcareException> {
+            healthMgmtFacility.accessRecord(
+                doctor.identity,
+                alice.identity,
+                LuceRight(PatientRecord.RECORD_RIGHT_ID_READ),
+                UsageListener()
+            )
+        }
     }
 }

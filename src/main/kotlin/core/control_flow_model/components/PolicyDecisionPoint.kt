@@ -212,8 +212,7 @@ class PolicyDecisionPoint {
                     SessionPip.finishLock(session)
 
                     // notify listener
-                    // TODO logic -> revokeSolution
-                    listener.onRevocation(RevocationResponse())
+                    listener.onRevocation(RevocationResponse(revokeSolution))
                 }
             }
         }
@@ -263,8 +262,7 @@ class PolicyDecisionPoint {
             // end usage
             SessionPip.finishLock(session)
 
-            // TODO logic -> endSolution
-            return EndResponse()
+            return EndResponse(endSolution)
         }
 
     }
