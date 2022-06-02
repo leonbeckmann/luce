@@ -184,6 +184,7 @@ internal class PolicyDecisionPointTest {
         // register PMP
         ComponentRegistry.policyManagementPoint = ExamplePmpOngoingSuccess()
 
+        sessions.clear()
         assert(sessions.isEmpty())
 
         val o = ExampleObject("object1", "subject1")
