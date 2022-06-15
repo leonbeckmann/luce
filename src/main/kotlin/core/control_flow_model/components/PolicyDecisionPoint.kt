@@ -10,7 +10,7 @@ import it.unibo.tuprolog.solve.SolveOptions
 import org.slf4j.LoggerFactory
 
 /**
- * LUCE PDP
+ * LUCE PDP, as defined in LUCE's control flow model (see Section 6.1.1)
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
@@ -75,8 +75,8 @@ class PolicyDecisionPoint {
 
             // iterate over policies until one is applicable
             for (genericPolicy in genericPolicies.listIterator()) {
-                // replace generic $OBJECT, $SUBJECT and $RIGHT by specific values
 
+                // replace generic $OBJECT, $SUBJECT and $RIGHT by specific values
                 val policy = genericPolicy.replaceVariables(
                     request.luceSubject.identity.toString(),
                     request.luceObject.identity.toString(),
@@ -111,7 +111,7 @@ class PolicyDecisionPoint {
                         session.feedEvent(UsageSession.Event.PermitAccess(policy, request.listener, timer))
                         assert(session.state is UsageSession.State.Accessing)
 
-                        // TODO UR2
+                        // TODO Future Work: Add UR2 (Post-Permit Rule) support
 
                         // unlock session for further usage
                         SessionPip.finishLock(session)

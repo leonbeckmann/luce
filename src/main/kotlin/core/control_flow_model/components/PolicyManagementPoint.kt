@@ -5,7 +5,7 @@ import core.admin.LuceRight
 import core.policies.LucePolicy
 
 /**
- * LUCE PMP
+ * LUCE PMP, as defined in LUCE's control flow model (see Section 6.1.1)
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
@@ -13,6 +13,10 @@ interface PolicyManagementPoint {
 
     /**
      * A function to pull a list of applicable policies from the PMP
+     *
+     * The list should be empty if no applicable policy is deployed.
+     * The list should have at most size one if 'Deny-overrides' Policy Combination is used.
+     * The list should have at most size one if 'Only-one-applicable' Policy Combination is used
      *
      * @param obj: LuceObject
      * @param right: LuceRight

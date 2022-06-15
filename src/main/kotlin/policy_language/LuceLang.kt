@@ -350,7 +350,7 @@ class LuceLang  {
 
             return LucePolicy(
                 translationHelper(obj.policy.preAccess.predicates),
-                Truth.TRUE, // TODO Post Permit
+                Truth.TRUE, // TODO Future Work: Post Permit
                 translationHelper(obj.policy.ongoingAccess.predicates),
                 period,
                 translationHelper(obj.policy.postRevocation.predicates),

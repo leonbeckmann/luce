@@ -6,7 +6,10 @@ import core.policies.LucePolicy
 import java.util.concurrent.locks.ReentrantLock
 
 /**
- * Usage Decision Process, including its FSM
+ * Usage Decision Process, including its FSM (see Section 5.2.1)
+ *
+ * The FSM only contains transitions that change the state.
+ * All other transitions are handled implicitly.
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
@@ -67,12 +70,19 @@ class UsageSession(val id: String) {
     var state: State = State.Initial
         private set
 
+    /**
+     * Reset the session to initial state
+     */
     fun reset() {
         this.state = State.Initial
     }
 
+    /**
+     * Cancel the re-evaluation timer
+     */
     fun cancelTimer() {
         if (state is State.Accessing) {
+            // only accessing state has reevaluation timer
             (state as State.Accessing).reevaluationTimer?.cancel()
             (state as State.Accessing).reevaluationTimer = null
         }
@@ -88,6 +98,8 @@ class UsageSession(val id: String) {
      */
     private data class TransitionKey(val state: String, val event: String)
     private val transitions = HashMap<TransitionKey, Transition>()
+
+    // default transition into Error state, called when no other transition matches
     private val defaultTransition: Transition = Transition {
         State.Error
     }
@@ -123,15 +135,24 @@ class UsageSession(val id: String) {
         }
     }
 
+    /**
+     * Feed a event into the FSM, trigger the corresponding transition for (state, event)
+     */
     fun feedEvent(e: Event) {
         val t = transitions.getOrDefault(TransitionKey(state.id, e.id), defaultTransition)
         this.state = t.doTransition(e)
     }
 
+    /**
+     * Lock the session for mutual access
+     */
     fun lock() {
         lock.lock()
     }
 
+    /**
+     * Unlock the session
+     */
     fun unlock() {
         lock.unlock()
     }

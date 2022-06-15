@@ -2,7 +2,6 @@ package healthcare
 
 import core.admin.LuceObject
 import core.admin.LuceRight
-import java.security.cert.X509Certificate
 
 class PatientRecord(
     identity: String,

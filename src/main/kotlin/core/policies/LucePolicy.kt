@@ -7,7 +7,7 @@ import it.unibo.tuprolog.dsl.prolog
 import kotlin.math.min
 
 /**
- * Low-level LUCE policy
+ * Low-level LUCE policy, as defined in LUCE's enforcement model (see Section 6.2)
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
@@ -21,11 +21,12 @@ class LucePolicy(
 ) {
 
     /**
-     * A function to merge together two low-level policies according to "Deny-overrides" from "Policy Combining" in 6.3.3
+     * A function to merge together two low-level policies according to "Deny-overrides" from "Policy Combining" in 6.3.2
      *
      * @return A fresh policy, combining this and the given policy
      */
     fun mergeByConjunction(policy: LucePolicy) : LucePolicy {
+        // TODO Future Work: Specify how to combine multiple triggers
         val period = if (ongoingPeriod != null && policy.ongoingPeriod != null) {
             min(ongoingPeriod, policy.ongoingPeriod)
         } else ongoingPeriod ?: policy.ongoingPeriod

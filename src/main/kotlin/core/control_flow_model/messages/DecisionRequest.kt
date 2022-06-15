@@ -6,7 +6,7 @@ import core.admin.LuceSubject
 import core.control_flow_model.components.PolicyEnforcementPoint
 
 /**
- * Decision Request
+ * Decision Request, used for requesting a new decision request for a usage (S,O,R)
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */

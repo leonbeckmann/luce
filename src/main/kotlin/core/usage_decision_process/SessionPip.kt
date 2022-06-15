@@ -7,13 +7,17 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Usage Session PIP, providing usage session information to the PDP
+ * Usage Session PIP, as mentioned in LUCE's control flow model (see Section 6.1.1)
+ *
+ * Provides usage session information to the PDP
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
 object SessionPip {
 
     private val LOG = LoggerFactory.getLogger(SessionPip::class.java)
+
+    // all active sessions
     private val sessions = ConcurrentHashMap<String, UsageSession>()
 
     /**
@@ -46,6 +50,7 @@ object SessionPip {
                 throw InUseException("Session with id=$id is currently used")
             }
 
+            // not in initial state and not in accessing state, should not be in registry then
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
                     "state=${UsageSession.State.Initial}")
         }
@@ -73,6 +78,7 @@ object SessionPip {
             val state = session.state
             session.unlock()
 
+            // not in accessing state
             throw LuceException("Session with id=$id in state=${state} is not in expected " +
                     "state=${UsageSession.State.Accessing}")
         }
@@ -97,13 +103,14 @@ object SessionPip {
             return
         }
 
-        // remove finished sessions from registry
+        // otherwise, remove finished sessions from registry
         if (LOG.isTraceEnabled) {
             LOG.trace("Remove usage session with id=${session.id}")
         }
 
         // remove the session from the map to avoid race conditions that could occur after we check for waiters
         sessions.remove(session.id)
+        // also remove the PIP that provides us with session information, e.g. PEP listener
         ComponentRegistry.removePolicyInformationPoint(session.id)
 
         // check if there are other waiters, if so reset the session to initial config
@@ -112,6 +119,8 @@ object SessionPip {
                 LOG.trace("Session with id=${session.id} has active waiters - only reset the session")
             }
             session.reset()
+            // TODO check if there is a race condition when a session with the same ID is created while it is
+            //  reinserted here -> if so lock the session registry
             sessions[session.id] = session
         }
 

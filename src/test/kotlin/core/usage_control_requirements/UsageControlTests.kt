@@ -16,7 +16,7 @@ import java.time.ZoneOffset
 import java.util.concurrent.Semaphore
 
 /**
- * Testing Usage Control Requirements from Section 5
+ * Testing Usage Control Requirements from Section 4.2
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */

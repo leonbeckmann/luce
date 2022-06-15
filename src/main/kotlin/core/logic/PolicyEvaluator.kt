@@ -17,8 +17,13 @@ class PolicyEvaluator {
     companion object {
 
         private val LOG = LoggerFactory.getLogger(PolicyEvaluator::class.java)
+
+        // a library registry to inject own PROLOG code into the usage decision
         private val libraries = mutableSetOf<AliasedLibrary>(DefaultLibrary())
 
+        /**
+         * Register a custom library with own PROLOG code
+         */
         fun registerCustomLibrary(library: AliasedLibrary) {
             if (LOG.isTraceEnabled) {
                 LOG.trace("Register custom library with alias=${library.alias}")
@@ -26,6 +31,9 @@ class PolicyEvaluator {
             libraries.add(library)
         }
 
+        /**
+         * Unregister a custom library
+         */
         fun unregisterCustomLibrary(library: AliasedLibrary) {
             if (LOG.isTraceEnabled) {
                 LOG.trace("Unregister custom library with alias=${library.alias}")
@@ -33,6 +41,11 @@ class PolicyEvaluator {
             libraries.remove(library)
         }
 
+        /**
+         * Evaluate a policy decision by querying the goal statement
+         *
+         * @return the solution, containing the decision result and applied substitutions
+         */
         fun evaluate(goal: Struct, options: SolveOptions): Solution {
 
             if (LOG.isTraceEnabled) {
@@ -45,7 +58,7 @@ class PolicyEvaluator {
                 solver.loadLibrary(it)
             }
 
-            // solve and return solution
+            // solve one possible solution and return
             return solver.solveOnce(goal, options)
         }
 

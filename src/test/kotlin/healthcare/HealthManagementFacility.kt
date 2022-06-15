@@ -18,7 +18,9 @@ import java.security.cert.X509Certificate
 import java.util.UUID
 
 /**
+ *  Trusted HealthManagementFacility, acts as the root authority, the PMP and a PIP for retrieving attributes
  *
+ *  @author Leon Beckmann <leon.beckmann@tum.de>
  */
 class HealthManagementFacility(
     val cert: X509Certificate

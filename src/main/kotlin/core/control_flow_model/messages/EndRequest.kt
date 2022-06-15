@@ -5,7 +5,7 @@ import core.admin.LuceRight
 import core.admin.LuceSubject
 
 /**
- * End Request
+ * End Request, used to trigger endaccess for session (S,O,R)
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */

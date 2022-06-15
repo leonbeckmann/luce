@@ -1,7 +1,7 @@
 package core.control_flow_model.messages
 
 /**
- * Decision Response
+ * Decision Response, returned by the PDP to the decision requester
  *
  * @author Leon Beckmann <leon.beckmann@tum.de>
  */
